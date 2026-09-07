@@ -1,0 +1,938 @@
+// Sales Client Entertainment & Expense Management System
+// Backend API Core - Prisma schema (BRD section 27-29)
+// Scope: Auth/RBAC, Master Data, Event, Expense, Invoice (schema only, no OCR/LLM processing yet),
+// Approval Workflow, Audit Trail. OCR/Matching/Import/Notification worker tables intentionally
+// deferred to the AI-Worker phase (BRD out of scope for "Backend API Core").
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth / RBAC (BRD section 5, 27, 34)
+// ---------------------------------------------------------------------------
+
+// Not used by any column - kept only so `RoleName` still exists as a generated
+// TS enum for the ~30 `@Roles(RoleName.X)` guard call sites across the API,
+// which protect the app's built-in feature set and are NOT dynamic. Role.name
+// itself (below) is a free-text column: Admin can create additional custom
+// roles via the Role master page, but a custom role has no route guard wired
+// to it, so it grants no extra access until a developer adds one.
+enum RoleName {
+  SALES
+  SUPERVISOR
+  FINANCE
+  ADMIN
+  MANAGEMENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id            String     @id @default(uuid())
+  employeeId    String     @unique
+  name          String
+  email         String     @unique
+  phone         String?
+  positionId    String?
+  position      Position?  @relation(fields: [positionId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  unitId        String?
+  unit          Unit?      @relation(fields: [unitId], references: [id])
+  status        UserStatus @default(ACTIVE)
+  profilePhoto  String?
+  passwordHash  String
+
+  roles         UserRole[]
+
+  podMemberships       PodMember[]        @relation("PodMemberSales")
+  salesAssignments     SalesAssignment[]  @relation("AssignmentSales")
+  events               Event[]            @relation("EventSales")
+  expenses             Expense[]          @relation("ExpenseSales")
+  invoicesModified     Invoice[]          @relation("InvoiceModifiedBy")
+  approvalActions      ApprovalAction[]   @relation("ApprovalActor")
+  approvalRequestSteps ApprovalRequestStep[] @relation("ApprovalStepApprover")
+  podApproverOf        PodPositionAssignment[] @relation("PodPositionUser")
+  auditLogs            AuditLog[]
+  bankSettlementBatches BankSettlementBatch[] @relation("BatchUploadedBy")
+  bankTransactionsMatched BankTransaction[]   @relation("BankTxnMatchedBy")
+  settlementsCreated    Settlement[]         @relation("SettlementCreatedBy")
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  // Free text (not the RoleName enum) - lets Admin create custom roles beyond
+  // the 5 built-in ones. See the RoleName enum's comment above for the caveat.
+  name        String           @unique
+  description String?
+  isActive    Boolean          @default(true)
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  description String?
+  isActive    Boolean          @default(true)
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------------------
+// Master Data (BRD section 16)
+// ---------------------------------------------------------------------------
+
+model Department {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  users     User[]
+  events    Event[]
+  expenses  Expense[]
+  approvalLevels ApprovalLevel[]
+  settlements Settlement[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("departments")
+}
+
+model Position {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  users     User[]
+  levelSteps        ApprovalLevelStep[]
+  podAssignments    PodPositionAssignment[]
+  requestSteps      ApprovalRequestStep[]
+  actionsAsPosition ApprovalAction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("positions")
+}
+
+// Who holds a given Position for a specific POD - needed because "Head POD"
+// differs per POD (Pod 1's Head POD != Pod 2's Head POD), unlike Department
+// positions which resolve directly off User.departmentId.
+model PodPositionAssignment {
+  id         String   @id @default(uuid())
+  podId      String
+  pod        Pod      @relation(fields: [podId], references: [id], onDelete: Cascade)
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id])
+  userId     String
+  user       User     @relation("PodPositionUser", fields: [userId], references: [id])
+  status     String   @default("ACTIVE")
+  createdAt  DateTime @default(now())
+
+  @@unique([podId, positionId])
+  @@map("pod_position_assignments")
+}
+
+model Unit {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  users     User[]
+  assignments SalesAssignment[]
+  events    Event[]
+  expenses  Expense[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("units")
+}
+
+// Agency -> Advertiser -> Brand is a strict ownership chain: an Agency represents
+// many Advertisers, each Advertiser owns many Brands, and each Brand belongs to
+// exactly one Advertiser (never shared). Agency and Advertiser are deliberately
+// distinct entities - Agency is not the same thing as an Advertiser.
+model Agency {
+  id          String       @id @default(uuid())
+  code        String       @unique
+  name        String
+  isActive    Boolean      @default(true)
+  advertisers Advertiser[]
+  podAssignments PodAssignment[]
+  expenseAgencies ExpenseAgency[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("agencies")
+}
+
+model Advertiser {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  name      String
+  isActive  Boolean   @default(true)
+  agencyId  String
+  agency    Agency    @relation(fields: [agencyId], references: [id])
+  brands    Brand[]
+  events    Event[]
+  expenses  Expense[]
+  expenseAdvertisers ExpenseAdvertiser[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("advertisers")
+}
+
+model Brand {
+  id            String          @id @default(uuid())
+  code          String          @unique
+  name          String
+  isActive      Boolean         @default(true)
+  advertiserId  String
+  advertiser    Advertiser      @relation(fields: [advertiserId], references: [id])
+  podAssignments PodAssignment[]
+  events        Event[]
+  expenses      Expense[]
+  expenseBrands ExpenseBrand[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@map("brands")
+}
+
+// Credit Card master data - Sales pick the company card used to pay for an
+// Expense (BR: card is master-managed, not free text, so Finance can reconcile
+// against the bank settlement PDF via AutoMatching).
+// 1 POD = 1 credit card: a Sales in a given POD may only spend on that POD's
+// own card. podId is unique so a card can't be assigned to more than one POD.
+model CreditCard {
+  id             String    @id @default(uuid())
+  bank           String
+  last4          String
+  cardHolderName String
+  isActive       Boolean   @default(true)
+  podId          String?   @unique
+  pod            Pod?      @relation(fields: [podId], references: [id])
+  expenses       Expense[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("credit_cards")
+}
+
+// POD = a named coverage group covering multiple Sales (BRD section 6.2),
+// containing multiple Agency <-> Brand pairings: pick an Agency, pick one or
+// more of its Advertisers, pick one or more Brands under those Advertisers -
+// each selected Brand becomes one PodAssignment row tagged with that Agency.
+// A Brand can only appear once per POD (enforced by PodAssignment's
+// @@unique([podId, brandId])), but one Agency can cover many Brands within
+// the same POD. Membership (which Sales cover this POD) is a separate
+// many-to-many via PodMember - a POD is one row regardless of how many Sales
+// cover it.
+model Pod {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  isActive Boolean @default(true)
+
+  members     PodMember[]
+  assignments PodAssignment[]
+  expenses    Expense[]
+  approvers   PodPositionAssignment[]
+  approvalLevels ApprovalLevel[]
+  events      Event[]
+  settlements Settlement[]
+  creditCard  CreditCard?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pods")
+}
+
+// Which Sales cover a given POD - many-to-many (a POD can have several Sales,
+// and in principle a Sales could cover more than one POD).
+model PodMember {
+  id        String   @id @default(uuid())
+  podId     String
+  pod       Pod      @relation(fields: [podId], references: [id], onDelete: Cascade)
+  salesId   String
+  sales     User     @relation("PodMemberSales", fields: [salesId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([podId, salesId])
+  @@map("pod_members")
+}
+
+// One Agency <-> Brand pairing within a POD. A POD can cover multiple Brands
+// under the same Agency (e.g. picking several Advertisers under an Agency, then
+// several Brands under those) - uniqueness is per Brand, not per Agency, so the
+// same Brand can't be added twice to one POD. The paired Brand's actual
+// Advertiser/Agency ownership chain is validated against agencyId at the service
+// layer (PodsService) - schema can't express that cross-relation check.
+model PodAssignment {
+  id            String    @id @default(uuid())
+  podId         String
+  pod           Pod       @relation(fields: [podId], references: [id], onDelete: Cascade)
+  agencyId      String
+  agency        Agency    @relation(fields: [agencyId], references: [id])
+  brandId       String
+  brand         Brand     @relation(fields: [brandId], references: [id])
+  effectiveDate DateTime  @default(now())
+  endDate       DateTime?
+  status        String    @default("ACTIVE")
+
+  @@unique([podId, brandId])
+  @@map("pod_assignments")
+}
+
+// Sales <-> Unit assignment history (BRD section 27)
+model SalesAssignment {
+  id            String    @id @default(uuid())
+  salesId       String
+  sales         User      @relation("AssignmentSales", fields: [salesId], references: [id])
+  unitId        String
+  unit          Unit      @relation(fields: [unitId], references: [id])
+  effectiveDate DateTime
+  endDate       DateTime?
+  status        String    @default("ACTIVE")
+  createdAt     DateTime  @default(now())
+
+  @@map("sales_assignments")
+}
+
+model ActivityType {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  events    Event[]
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+
+  @@map("activity_types")
+}
+
+model CostCenter {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  name      String
+  isActive  Boolean   @default(true)
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+
+  @@map("cost_centers")
+}
+
+model ExpenseCategory {
+  id           String        @id @default(uuid())
+  code         String        @unique
+  name         String
+  isActive     Boolean       @default(true)
+  expenseItems ExpenseItem[]
+  createdAt    DateTime      @default(now())
+
+  @@map("expense_categories")
+}
+
+model Merchant {
+  id             String     @id @default(uuid())
+  name           String
+  normalizedName String
+  alias          String[]   @default([])
+  isActive       Boolean    @default(true)
+  invoices       Invoice[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([normalizedName])
+  @@map("merchants")
+}
+
+// ---------------------------------------------------------------------------
+// Event / Pre-Event (BRD section 7, 8)
+// ---------------------------------------------------------------------------
+
+enum EventStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model Event {
+  id                String       @id @default(uuid())
+  eventNo           String       @unique
+  salesId           String
+  sales             User         @relation("EventSales", fields: [salesId], references: [id])
+  unitId            String
+  unit              Unit         @relation(fields: [unitId], references: [id])
+  podId             String?
+  pod               Pod?         @relation(fields: [podId], references: [id])
+  departmentId      String?
+  department        Department?  @relation(fields: [departmentId], references: [id])
+  advertiserId      String
+  advertiser        Advertiser   @relation(fields: [advertiserId], references: [id])
+  brandId           String
+  brand             Brand        @relation(fields: [brandId], references: [id])
+  activityTypeId    String
+  activityType      ActivityType @relation(fields: [activityTypeId], references: [id])
+  date              DateTime
+  startTime         String?
+  endTime           String?
+  location          String?
+  purpose           String
+  estimatedAmount   Decimal      @db.Decimal(18, 2)
+  notes             String?
+  status            EventStatus  @default(DRAFT)
+  rejectReason      String?
+
+  participants      EventParticipant[]
+  expenses          Expense[]
+  approvalRequest   ApprovalRequest?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("events")
+}
+
+model EventParticipant {
+  id       String  @id @default(uuid())
+  eventId  String
+  event    Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name     String
+  position String?
+  company  String?
+
+  @@map("event_participants")
+}
+
+// ---------------------------------------------------------------------------
+// Expense / Invoice (BRD section 9, 15, 21, 28, 29, 43)
+// ---------------------------------------------------------------------------
+
+enum ExpenseStatus {
+  DRAFT
+  PROCESSING
+  OCR_COMPLETED
+  MATCHING
+  NEEDS_REVIEW
+  READY_TO_SUBMIT
+  SUBMITTED
+  // Generic fallback - used only when the current approval step's Position has
+  // no matching APPROVAL_<code> value below (e.g. a brand-new Position an Admin
+  // just created and no migration has added a status for yet).
+  PENDING_APPROVAL
+  // One value per Position.code in today's master data (see prisma/seed.ts
+  // positionDefs) - ApprovalsService.pendingStatusForPosition() derives these
+  // from whatever Position sits at the Expense's current approval step, so the
+  // status itself always names the tier currently reviewing it.
+  APPROVAL_HEAD_POD
+  APPROVAL_KOORDINATOR
+  APPROVAL_SUPERVISOR
+  APPROVAL_DEPT_HEAD
+  APPROVAL_DIV_HEAD
+  APPROVAL_BOD
+  // No longer produced by new code (final approval step now sets SETTLED
+  // directly, no manual Finance settle) - kept for historical rows only.
+  APPROVED
+  REJECTED
+  REVISION
+  SETTLED
+}
+
+enum PaymentMethodType {
+  CREDIT_CARD
+  GOPAY
+  SHOPEEPAY
+  DANA
+  OVO
+  BANK_TRANSFER
+  CASH
+  OTHER
+}
+
+model Expense {
+  id              String        @id @default(uuid())
+  expenseNo       String        @unique
+  salesId         String
+  sales           User          @relation("ExpenseSales", fields: [salesId], references: [id])
+  unitId          String
+  unit            Unit          @relation(fields: [unitId], references: [id])
+  podId           String?
+  pod             Pod?          @relation(fields: [podId], references: [id])
+  departmentId    String?
+  department      Department?   @relation(fields: [departmentId], references: [id])
+  advertiserId    String
+  advertiser      Advertiser    @relation(fields: [advertiserId], references: [id])
+  brandId         String
+  brand           Brand         @relation(fields: [brandId], references: [id])
+  // Pre-Event used to be mandatory; an Expense can now also be created directly
+  // (no approved Event) - see ExpensesService.create. When eventId IS given, it
+  // must still be APPROVED and owned by the same Sales, and Advertiser/Brand/
+  // Unit/ActivityType are inherited from it exactly as before.
+  eventId         String?
+  event           Event?        @relation(fields: [eventId], references: [id])
+  activityTypeId  String
+  activityType    ActivityType  @relation(fields: [activityTypeId], references: [id])
+  costCenterId    String?
+  costCenter      CostCenter?   @relation(fields: [costCenterId], references: [id])
+  paymentMethodType PaymentMethodType?
+  // Free-text detail for the chosen payment method - e-wallet account/phone for
+  // GOPAY/SHOPEEPAY/DANA/OVO, or the label itself for OTHER. Unused for CREDIT_CARD
+  // (creditCardId already identifies the card).
+  paymentMethodNote String?
+  creditCardId    String?
+  creditCard      CreditCard?   @relation(fields: [creditCardId], references: [id])
+  merchantName    String?
+  // Free text - typically "lat, lng" filled from the browser's Geolocation API,
+  // or a manually typed address/venue name.
+  location        String?
+  expenseDate     DateTime
+  purpose         String
+  amount          Decimal       @db.Decimal(18, 2)
+  status          ExpenseStatus @default(DRAFT)
+  // Mirrors whether this Expense has a bank transaction currently AUTO_MATCHED
+  // or MANUAL_MATCHED (see BankMatchingService.recomputeIsMatched) - kept as a
+  // column rather than derived on every read so Settlement eligibility (only
+  // isMatched Expenses can enter a Settlement) is a plain indexed filter.
+  isMatched       Boolean       @default(false)
+  settlementId    String?
+  settlement      Settlement?   @relation(fields: [settlementId], references: [id])
+
+  items           ExpenseItem[]
+  invoices        Invoice[]
+  approvalRequest ApprovalRequest?
+  // Additional Brands beyond the single Brand inherited from the approved
+  // Pre-Event (BR-002 keeps that one locked/mandatory) - lets Sales tag an
+  // Expense as also covering other Brands entertained in the same activity.
+  extraBrands     ExpenseBrand[]
+  // Additional Agencies/Advertisers entertained in the same activity, same
+  // add/remove pattern as extraBrands - auto pre-filled from the Pre-Event's
+  // Advertiser/Agency on the client but freely editable before submit.
+  extraAgencies    ExpenseAgency[]
+  extraAdvertisers ExpenseAdvertiser[]
+  // Agency/Advertiser/Employee attendees (name + jabatan), same shape as
+  // EventParticipant but recorded per Expense rather than per Pre-Event.
+  participants    ExpenseParticipant[]
+  photos          ExpensePhoto[]
+  bankTransactions BankTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("expenses")
+}
+
+enum ParticipantCategory {
+  AGENCY
+  ADVERTISER
+  EMPLOYEE
+}
+
+model ExpenseParticipant {
+  id        String              @id @default(uuid())
+  expenseId String
+  expense   Expense             @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  category  ParticipantCategory
+  name      String
+  position  String?
+  company   String?
+  createdAt DateTime            @default(now())
+
+  @@map("expense_participants")
+}
+
+model ExpenseBrand {
+  id        String   @id @default(uuid())
+  expenseId String
+  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([expenseId, brandId])
+  @@map("expense_brands")
+}
+
+model ExpenseAgency {
+  id        String   @id @default(uuid())
+  expenseId String
+  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  agencyId  String
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([expenseId, agencyId])
+  @@map("expense_agencies")
+}
+
+model ExpenseAdvertiser {
+  id           String     @id @default(uuid())
+  expenseId    String
+  expense      Expense    @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  advertiserId String
+  advertiser   Advertiser @relation(fields: [advertiserId], references: [id])
+  createdAt    DateTime   @default(now())
+
+  @@unique([expenseId, advertiserId])
+  @@map("expense_advertisers")
+}
+
+// Foto Kegiatan (activity photos) - separate from Invoice/InvoiceFile since
+// these document the entertainment activity itself, not the merchant bill.
+model ExpensePhoto {
+  id         String   @id @default(uuid())
+  expenseId  String
+  expense    Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  storageKey String
+  fileName   String
+  mimeType   String
+  size       Int
+  checksum   String
+  createdAt  DateTime @default(now())
+
+  @@map("expense_photos")
+}
+
+model ExpenseItem {
+  id          String            @id @default(uuid())
+  expenseId   String
+  expense     Expense           @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  description String
+  amount      Decimal           @db.Decimal(18, 2)
+  categoryId  String?
+  category    ExpenseCategory?  @relation(fields: [categoryId], references: [id])
+
+  @@map("expense_items")
+}
+
+enum MatchingStatus {
+  UNMATCHED
+  AUTO_MATCHED
+  REVIEW_REQUIRED
+  MANUAL_MATCHED
+}
+
+// Invoice: OCR/final split per BRD section 15 (Data Source Classification) and
+// section 21 (Invoice Data Integrity). OCR/LLM pipeline itself is out of scope
+// for Backend API Core - these ocr_* fields are populated manually or by a
+// future worker via the same fields.
+model Invoice {
+  id                     String         @id @default(uuid())
+  expenseId              String
+  expense                Expense        @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  invoiceNumber          String?
+  invoiceDate            DateTime?
+  merchantId             String?
+  merchant               Merchant?      @relation(fields: [merchantId], references: [id])
+
+  ocrMerchantName        String?
+  finalMerchantName      String?
+
+  ocrSubtotal            Decimal?       @db.Decimal(18, 2)
+  finalSubtotal          Decimal?       @db.Decimal(18, 2)
+
+  ocrTax                 Decimal?       @db.Decimal(18, 2)
+  finalTax               Decimal?       @db.Decimal(18, 2)
+
+  ocrServiceCharge       Decimal?       @db.Decimal(18, 2)
+  finalServiceCharge     Decimal?       @db.Decimal(18, 2)
+
+  ocrDiscount            Decimal?       @db.Decimal(18, 2)
+  finalDiscount          Decimal?       @db.Decimal(18, 2)
+
+  ocrTotal               Decimal?       @db.Decimal(18, 2)
+  finalTotal             Decimal?       @db.Decimal(18, 2)
+
+  ocrConfidence          Decimal?       @db.Decimal(5, 2)
+  matchingStatus         MatchingStatus @default(UNMATCHED)
+
+  modifiedById            String?
+  modifiedBy               User?        @relation("InvoiceModifiedBy", fields: [modifiedById], references: [id])
+  modifiedAt               DateTime?
+
+  files                  InvoiceFile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("invoices")
+}
+
+// BRD section 30 - object storage metadata only, no BLOB in Postgres
+model InvoiceFile {
+  id         String   @id @default(uuid())
+  invoiceId  String
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  fileType   String   // ORIGINAL | PROCESSED
+  storageKey String
+  fileName   String
+  mimeType   String
+  size       Int
+  checksum   String
+
+  createdAt DateTime @default(now())
+
+  @@map("invoice_files")
+}
+
+// ---------------------------------------------------------------------------
+// Approval Workflow (BRD section 22, 23, 44 BR-013/BR-014)
+// ---------------------------------------------------------------------------
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalStepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DocumentStage {
+  PRE_EVENT
+  // Expense's own submit -> approval chain (BRD section 22-23) - despite the
+  // enum name, ExpensesService.submit() is being switched to EXPENSES (see
+  // migration 20260904_backfill below); SETTLEMENT is kept for a future
+  // Settlement-entity-level approval flow, not currently wired to anything.
+  EXPENSES
+  SETTLEMENT
+}
+
+enum ApprovalScopeType {
+  ANY
+  POD
+  DEPARTMENT
+}
+
+model ApprovalLevel {
+  id            String            @id @default(uuid())
+  name          String
+  documentStage DocumentStage
+  scopeType     ApprovalScopeType @default(ANY)
+  podId         String?
+  pod           Pod?              @relation(fields: [podId], references: [id])
+  departmentId  String?
+  department    Department?       @relation(fields: [departmentId], references: [id])
+  minAmount     Decimal           @db.Decimal(18, 2) @default(0)
+  maxAmount     Decimal?          @db.Decimal(18, 2)
+  isActive      Boolean           @default(true)
+  steps         ApprovalLevelStep[]
+  requests      ApprovalRequest[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@map("approval_levels")
+}
+
+model ApprovalLevelStep {
+  id              String        @id @default(uuid())
+  approvalLevelId String
+  approvalLevel   ApprovalLevel @relation(fields: [approvalLevelId], references: [id], onDelete: Cascade)
+  stepOrder       Int
+  positionId      String
+  position        Position      @relation(fields: [positionId], references: [id])
+
+  @@unique([approvalLevelId, stepOrder])
+  @@map("approval_level_steps")
+}
+
+model ApprovalRequest {
+  id              String         @id @default(uuid())
+  documentStage   DocumentStage
+  expenseId       String?        @unique
+  expense         Expense?       @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  eventId         String?        @unique
+  event           Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  approvalLevelId String
+  approvalLevel   ApprovalLevel  @relation(fields: [approvalLevelId], references: [id])
+  currentStep     Int            @default(0)
+  status          ApprovalStatus @default(PENDING)
+  steps           ApprovalRequestStep[]
+  actions         ApprovalAction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("approval_requests")
+}
+
+model ApprovalRequestStep {
+  id                 String              @id @default(uuid())
+  approvalRequestId  String
+  approvalRequest    ApprovalRequest     @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  stepOrder          Int
+  positionId         String
+  position           Position            @relation(fields: [positionId], references: [id])
+  resolvedApproverId String
+  resolvedApprover   User                @relation("ApprovalStepApprover", fields: [resolvedApproverId], references: [id])
+  status             ApprovalStepStatus  @default(PENDING)
+
+  // One-click email approval (BRD-adjacent feature): a single-use token mailed
+  // to resolvedApprover while this step is the request's current step. Cleared
+  // (set back to null) once used, so it can't be replayed.
+  emailToken          String?   @unique
+  emailTokenExpiresAt DateTime?
+
+  @@unique([approvalRequestId, stepOrder])
+  @@map("approval_request_steps")
+}
+
+enum ApprovalActionType {
+  APPROVE
+  REJECT
+}
+
+model ApprovalAction {
+  id                String             @id @default(uuid())
+  approvalRequestId String
+  approvalRequest   ApprovalRequest    @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  actorId           String
+  actor             User               @relation("ApprovalActor", fields: [actorId], references: [id])
+  positionId        String
+  position          Position           @relation(fields: [positionId], references: [id])
+  action            ApprovalActionType
+  reason            String?
+  actedAt           DateTime           @default(now())
+
+  @@map("approval_actions")
+}
+
+// ---------------------------------------------------------------------------
+// Auto Matching - Bank Settlement (reconcile Expense against a bank
+// settlement/credit-card statement PDF uploaded by Finance)
+// ---------------------------------------------------------------------------
+
+enum BankTxnStatus {
+  UNMATCHED
+  AUTO_MATCHED
+  REVIEW_REQUIRED
+  MANUAL_MATCHED
+}
+
+model BankSettlementBatch {
+  id           String            @id @default(uuid())
+  fileName     String
+  storageKey   String
+  // SHA-256 of the file content. Lets uploadAndMatch() detect "this exact file was
+  // already scanned" and short-circuit to the existing batch instead of reparsing
+  // (nullable+unique so legacy rows without a hash don't collide).
+  contentHash  String?           @unique
+  uploadedById String
+  uploadedBy   User              @relation("BatchUploadedBy", fields: [uploadedById], references: [id])
+  transactions BankTransaction[]
+  createdAt    DateTime          @default(now())
+
+  @@map("bank_settlement_batches")
+}
+
+model BankTransaction {
+  id               String              @id @default(uuid())
+  batchId          String
+  batch            BankSettlementBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  lineNo           Int
+  transactionDate  DateTime?
+  rawDescription   String
+  amount           Decimal             @db.Decimal(18, 2)
+  cardLast4        String?
+  status           BankTxnStatus       @default(UNMATCHED)
+  matchedExpenseId String?
+  matchedExpense   Expense?            @relation(fields: [matchedExpenseId], references: [id])
+  matchScore       Decimal?            @db.Decimal(5, 2)
+  matchedById      String?
+  matchedBy        User?               @relation("BankTxnMatchedBy", fields: [matchedById], references: [id])
+  matchedAt        DateTime?
+  createdAt        DateTime            @default(now())
+
+  @@map("bank_transactions")
+}
+
+// Groups a POD's already-matched (bank-reconciled) Expenses into one settlement
+// batch - one Settlement per POD per "Create Settlement" click (a Sales/Admin
+// covering several PODs gets one Settlement per POD with eligible Expenses).
+// settlementNo format: STL-YYMMDD#### (see SettlementsService.generateSettlementNo).
+model Settlement {
+  id             String      @id @default(uuid())
+  settlementNo   String      @unique
+  podId          String
+  pod            Pod         @relation(fields: [podId], references: [id])
+  // Null when the grouped Expenses don't all share the same Department.
+  departmentId   String?
+  department     Department? @relation(fields: [departmentId], references: [id])
+  totalAmount    Decimal     @db.Decimal(18, 2)
+  status         SettlementStatus @default(DRAFT)
+  createdById    String
+  createdBy      User        @relation("SettlementCreatedBy", fields: [createdById], references: [id])
+  expenses       Expense[]
+  createdAt      DateTime    @default(now())
+
+  @@map("settlements")
+}
+
+enum SettlementStatus {
+  DRAFT
+  COMPLETE
+}
+
+// ---------------------------------------------------------------------------
+// Audit Trail (BRD section 24)
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  objectType String
+  objectId   String?
+  oldValue   Json?
+  newValue   Json?
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  device     String?
+
+  @@index([objectType, objectId])
+  @@map("audit_logs")
+}

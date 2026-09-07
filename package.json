@@ -1,0 +1,67 @@
+{
+  "name": "sce-expense-api",
+  "version": "0.1.0",
+  "description": "Sales Client Entertainment & Expense Management System - Backend API Core",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node node_modules/@nestjs/cli/bin/nest.js build",
+    "start": "node node_modules/@nestjs/cli/bin/nest.js start",
+    "start:dev": "node node_modules/@nestjs/cli/bin/nest.js start --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint \"{src,test}/**/*.ts\" --fix",
+    "prisma:generate": "node node_modules/prisma/build/index.js generate",
+    "prisma:migrate": "node node_modules/prisma/build/index.js migrate dev",
+    "prisma:migrate:deploy": "node node_modules/prisma/build/index.js migrate deploy",
+    "prisma:studio": "node node_modules/prisma/build/index.js studio",
+    "seed": "node -r ts-node/register prisma/seed.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.4",
+    "@nestjs/config": "^3.2.3",
+    "@nestjs/core": "^10.4.4",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/passport": "^10.0.3",
+    "@nestjs/platform-express": "^10.4.4",
+    "@nestjs/throttler": "^5.2.0",
+    "@prisma/client": "^5.20.0",
+    "bcryptjs": "^2.4.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "csv-parse": "^5.5.6",
+    "exceljs": "^4.4.0",
+    "helmet": "^7.1.0",
+    "nodemailer": "^9.0.6",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "pdf-to-img": "^7.0.0",
+    "pdfjs-dist": "^6.2.108",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "tesseract.js": "^7.0.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.4.5",
+    "@nestjs/schematics": "^10.1.4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.14.15",
+    "@types/nodemailer": "^8.0.1",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/uuid": "^10.0.0",
+    "dotenv": "^16.4.5",
+    "pdf-lib": "^1.17.1",
+    "prisma": "^5.20.0",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  },
+  "prisma": {
+    "seed": "node -r ts-node/register prisma/seed.ts"
+  },
+  "overrides": {
+    "multer": "^2.2.0"
+  }
+}
