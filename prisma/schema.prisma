@@ -180,6 +180,7 @@ model Unit {
   assignments SalesAssignment[]
   events    Event[]
   expenses  Expense[]
+  participants ExpenseParticipant[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -198,6 +199,7 @@ model Agency {
   advertisers Advertiser[]
   podAssignments PodAssignment[]
   expenseAgencies ExpenseAgency[]
+  participants ExpenseParticipant[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -215,6 +217,7 @@ model Advertiser {
   events    Event[]
   expenses  Expense[]
   expenseAdvertisers ExpenseAdvertiser[]
+  participants ExpenseParticipant[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -568,15 +571,25 @@ enum ParticipantCategory {
   EMPLOYEE
 }
 
+// agencyId/advertiserId/unitId: which already-selected Agency/Advertiser this
+// participant belongs to (AGENCY/ADVERTISER category), or which Unit an
+// internal/EMPLOYEE participant belongs to - all optional since only one is
+// ever relevant depending on category, and older rows predate these columns.
 model ExpenseParticipant {
-  id        String              @id @default(uuid())
-  expenseId String
-  expense   Expense             @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  category  ParticipantCategory
-  name      String
-  position  String?
-  company   String?
-  createdAt DateTime            @default(now())
+  id           String              @id @default(uuid())
+  expenseId    String
+  expense      Expense             @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  category     ParticipantCategory
+  name         String
+  position     String?
+  company      String?
+  agencyId     String?
+  agency       Agency?             @relation(fields: [agencyId], references: [id])
+  advertiserId String?
+  advertiser   Advertiser?         @relation(fields: [advertiserId], references: [id])
+  unitId       String?
+  unit         Unit?               @relation(fields: [unitId], references: [id])
+  createdAt    DateTime            @default(now())
 
   @@map("expense_participants")
 }

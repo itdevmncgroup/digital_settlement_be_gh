@@ -71,6 +71,15 @@ export class BankMatchingController {
     return this.service.uploadAndMatch(file, actor.userId, force === 'true');
   }
 
+  // "TIDAK" branch of the web page's already-scanned prompt: re-run matching
+  // against current Expense data using this batch's already-parsed lines,
+  // without re-uploading/re-parsing the file.
+  @Post(':id/rematch')
+  @RequirePermission('expense.automatch')
+  rematch(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.rematch(id, actor.userId);
+  }
+
   @Post('transactions/:id/match')
   match(@Param('id') id: string, @Body() dto: ManualMatchDto, @CurrentUser() actor: AuthUser) {
     return this.service.manualMatch(id, dto.expenseId, actor.userId);

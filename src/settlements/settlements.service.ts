@@ -132,11 +132,14 @@ export class SettlementsService {
     return created;
   }
 
-  // Backs the Settlement page's "Create Settlement" popup: scoped to one POD +
-  // one date range (instead of create()'s "every eligible POD for this actor").
-  // Same eligibility rule as create() - SETTLED and matched - plus the picked
-  // podId/date range. A plain Sales caller may only target a POD they belong
-  // to; ADMIN/FINANCE may target any POD.
+  // Backs the Settlement page's "Create Settlement" popup: preview-only, scoped
+  // to one POD + one date range (instead of create()'s "every eligible POD for
+  // this actor") - same eligibility rule as create() (SETTLED and matched) plus
+  // the picked podId/date range. Nothing is persisted here; the web page's
+  // Submit step commits the user's checked subset via createFromSelection() or
+  // addExpenses() (see the "Buat baru"/"Tambahkan" choice when an open DRAFT
+  // settlement already covers this POD). A plain Sales caller may only target
+  // a POD they belong to; ADMIN/FINANCE may target any POD.
   async generate(podId: string, fromDate: string, toDate: string, actorId: string, actorRoles: string[]) {
     if (!this.isBackOffice(actorRoles)) {
       const membership = await this.prisma.podMember.findFirst({ where: { salesId: actorId, podId } });
@@ -148,21 +151,64 @@ export class SettlementsService {
     to.setHours(23, 59, 59, 999);
     if (from > to) throw new BadRequestException('"From" date must be before or equal to "To" date');
 
-    const eligible = await this.prisma.expense.findMany({
-      where: {
-        podId,
-        settlementId: null,
-        status: ExpenseStatus.SETTLED,
-        expenseDate: { gte: from, lte: to },
-        isMatched: true,
-      },
-      select: { id: true, podId: true, departmentId: true, amount: true },
-    });
-    if (eligible.length === 0) return { settlement: null, expenses: [] };
+    const [expenses, existingDraftSettlement] = await Promise.all([
+      this.prisma.expense.findMany({
+        where: {
+          podId,
+          settlementId: null,
+          status: ExpenseStatus.SETTLED,
+          expenseDate: { gte: from, lte: to },
+          isMatched: true,
+        },
+        select: {
+          id: true,
+          expenseNo: true,
+          expenseDate: true,
+          purpose: true,
+          amount: true,
+          status: true,
+          sales: { select: { id: true, name: true } },
+        },
+        orderBy: { expenseDate: 'asc' },
+      }),
+      this.prisma.settlement.findFirst({
+        where: { podId, status: SettlementStatus.DRAFT },
+        select: { id: true, settlementNo: true },
+      }),
+    ]);
 
-    const deptIds = new Set(eligible.map((e) => e.departmentId));
-    const departmentId = deptIds.size === 1 ? eligible[0].departmentId ?? undefined : undefined;
-    const totalAmount = eligible.reduce((sum, e) => sum + Number(e.amount), 0);
+    return { expenses, existingDraftSettlement };
+  }
+
+  // "Buat baru" - creates a brand-new Settlement from exactly the expenses the
+  // user checked in the preview table (instead of generate()'s old behaviour
+  // of auto-grabbing every eligible Expense in the date range). Same
+  // eligibility validation as addExpenses() so a stale/tampered selection is
+  // still rejected server-side.
+  async createFromSelection(podId: string, expenseIds: string[], actorId: string, actorRoles: string[]) {
+    if (!this.isBackOffice(actorRoles)) {
+      const membership = await this.prisma.podMember.findFirst({ where: { salesId: actorId, podId } });
+      if (!membership) throw new ForbiddenException('You are not a member of this POD');
+    }
+
+    const expenses = await this.prisma.expense.findMany({
+      where: { id: { in: expenseIds } },
+      select: { id: true, expenseNo: true, podId: true, departmentId: true, settlementId: true, status: true, isMatched: true, amount: true },
+    });
+    const found = new Set(expenses.map((e) => e.id));
+    const missing = expenseIds.filter((eid) => !found.has(eid));
+    const ineligible = expenses.filter(
+      (e) => e.podId !== podId || e.settlementId !== null || e.status !== ExpenseStatus.SETTLED || !e.isMatched,
+    );
+    if (missing.length > 0 || ineligible.length > 0) {
+      const bad = [...missing, ...ineligible.map((e) => e.expenseNo)];
+      throw new BadRequestException(`Not eligible for a new settlement: ${bad.join(', ')}`);
+    }
+    if (expenses.length === 0) throw new BadRequestException('Select at least one expense');
+
+    const deptIds = new Set(expenses.map((e) => e.departmentId));
+    const departmentId = deptIds.size === 1 ? expenses[0].departmentId ?? undefined : undefined;
+    const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const settlementNo = await this.generateSettlementNo();
 
     const settlement = await this.prisma.$transaction(async (tx) => {
@@ -170,7 +216,7 @@ export class SettlementsService {
         data: { settlementNo, podId, departmentId, totalAmount, createdById: actorId },
       });
       await tx.expense.updateMany({
-        where: { id: { in: eligible.map((e) => e.id) } },
+        where: { id: { in: expenseIds } },
         data: { settlementId: s.id },
       });
       return tx.settlement.findUniqueOrThrow({ where: { id: s.id }, include });
@@ -178,7 +224,59 @@ export class SettlementsService {
 
     await this.audit.log({ userId: actorId, action: 'CREATE', objectType: 'Settlement', objectId: settlement.id, newValue: settlement });
 
-    return { settlement, expenses: settlement.expenses };
+    return settlement;
+  }
+
+  // Same eligibility rule as create()/generate() (SETTLED + matched + ungrouped),
+  // scoped to one Settlement's POD - backs the web admin "Add Expenses" picker.
+  async eligibleExpenses(id: string) {
+    const settlement = await this.findOne(id);
+    return this.prisma.expense.findMany({
+      where: { podId: settlement.podId, settlementId: null, status: ExpenseStatus.SETTLED, isMatched: true },
+      select: { id: true, expenseNo: true, amount: true, expenseDate: true, purpose: true, sales: { select: { id: true, name: true } } },
+      orderBy: { expenseDate: 'desc' },
+    });
+  }
+
+  // Adds Expenses to an already-existing Settlement instead of only ever
+  // creating a new one - a DRAFT Settlement can keep growing as more of a
+  // POD's Expenses become SETTLED/matched.
+  async addExpenses(id: string, expenseIds: string[], actorId: string, actorRoles: string[]) {
+    const settlement = await this.findOne(id);
+    if (settlement.status !== SettlementStatus.DRAFT) {
+      throw new BadRequestException('Only a DRAFT settlement can have expenses added to it');
+    }
+    if (!this.isBackOffice(actorRoles)) {
+      const membership = await this.prisma.podMember.findFirst({ where: { salesId: actorId, podId: settlement.podId } });
+      if (!membership) throw new ForbiddenException('You are not a member of this POD');
+    }
+
+    const expenses = await this.prisma.expense.findMany({
+      where: { id: { in: expenseIds } },
+      select: { id: true, expenseNo: true, podId: true, settlementId: true, status: true, isMatched: true, amount: true },
+    });
+    const found = new Set(expenses.map((e) => e.id));
+    const missing = expenseIds.filter((eid) => !found.has(eid));
+    const ineligible = expenses.filter(
+      (e) => e.podId !== settlement.podId || e.settlementId !== null || e.status !== ExpenseStatus.SETTLED || !e.isMatched,
+    );
+    if (missing.length > 0 || ineligible.length > 0) {
+      const bad = [...missing, ...ineligible.map((e) => e.expenseNo)];
+      throw new BadRequestException(`Not eligible to add to this settlement: ${bad.join(', ')}`);
+    }
+
+    const addedTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.expense.updateMany({ where: { id: { in: expenseIds } }, data: { settlementId: id } });
+      return tx.settlement.update({
+        where: { id },
+        data: { totalAmount: Number(settlement.totalAmount) + addedTotal },
+        include,
+      });
+    });
+
+    await this.audit.log({ userId: actorId, action: 'UPDATE', objectType: 'Settlement', objectId: id, oldValue: settlement, newValue: updated });
+    return updated;
   }
 
   // Marks a Settlement's bookkeeping as reconciled/closed. Purely a flag on the

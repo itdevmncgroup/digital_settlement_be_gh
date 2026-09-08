@@ -30,6 +30,22 @@ export class ExpenseParticipantDto {
   @IsOptional()
   @IsString()
   company?: string;
+
+  // Which already-selected Agency/Advertiser this participant belongs to
+  // (AGENCY/ADVERTISER category), from the mobile app's Agency/Advertiser
+  // Participant comboboxes.
+  @IsOptional()
+  @IsString()
+  agencyId?: string;
+
+  @IsOptional()
+  @IsString()
+  advertiserId?: string;
+
+  // Which Unit an internal/EMPLOYEE-category participant belongs to.
+  @IsOptional()
+  @IsString()
+  unitId?: string;
 }
 
 // Pre-Event is retired (BR-002/BR-003): unitId/advertiserId/brandId/activityTypeId

@@ -47,6 +47,8 @@ async function main() {
     'settlement.read.ownpod',
     'settlement.read.all',
     'settlement.create.ownpod',
+    'dashboard.read.all',
+    'dashboard.read.ownpod',
     'master.manage',
     'user.manage',
     'report.export',

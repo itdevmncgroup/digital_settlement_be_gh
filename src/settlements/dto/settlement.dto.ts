@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsDateString, IsOptional, IsString } from 'class-validator';
 
 // Admin/Finance only - create on behalf of another Sales, same "on behalf" pattern
 // as CreateExpenseDto.salesId. Ignored for a plain Sales caller, who can only ever
@@ -21,4 +21,26 @@ export class GenerateSettlementDto {
 
   @IsDateString()
   toDate!: string;
+}
+
+// Adds already-eligible Expenses (SETTLED, matched, same POD, not yet grouped)
+// to an existing DRAFT Settlement - the "add to existing settlement" action on
+// the web admin Settlement page.
+export class AddExpensesToSettlementDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  expenseIds!: string[];
+}
+
+// "Buat baru" - the user's checked subset from the generate-preview table,
+// committed as a brand-new Settlement instead of growing an existing DRAFT one.
+export class CreateSettlementFromSelectionDto {
+  @IsString()
+  podId!: string;
+
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  expenseIds!: string[];
 }

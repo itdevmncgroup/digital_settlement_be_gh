@@ -17,7 +17,7 @@ export class AuthService {
   async login(email: string, password: string, meta: { ipAddress?: string | null; device?: string | null }) {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { roles: { include: { role: true } } },
+      include: { roles: { include: { role: true } }, position: true },
     });
 
     if (!user || user.status !== 'ACTIVE') {
@@ -50,6 +50,11 @@ export class AuthService {
         name: user.name,
         email: user.email,
         unitId: user.unitId,
+        // Position (HEAD_POD/DEPT_HEAD/DIV_HEAD/BOD/...) is distinct from Role
+        // (SALES/ADMIN/...) - the mobile app needs it client-side to decide
+        // whether the Approvals tab should always show (BOD) even before it's
+        // literally that user's turn on anything.
+        position: user.position,
         roles,
         permissions,
       },

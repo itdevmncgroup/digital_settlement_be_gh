@@ -159,6 +159,58 @@ export class BankMatchingService {
     return { ...(await this.findBatch(batch.id)), alreadyScanned: false };
   }
 
+  // "TIDAK" branch of the already-scanned prompt: re-run auto-matching against
+  // current Expense data using this batch's already-parsed transaction lines,
+  // without touching the PDF/OCR step at all. Only re-scores AUTO_MATCHED/
+  // REVIEW_REQUIRED/UNMATCHED lines - a MANUAL_MATCHED line is a human decision
+  // and is left alone, same as uploadAndMatch never touching it either.
+  async rematch(batchId: string, actorId: string) {
+    const batch = await this.findBatch(batchId);
+    const candidates = await this.loadCandidates();
+
+    for (const txn of batch.transactions) {
+      if (txn.status === BankTxnStatus.MANUAL_MATCHED) continue;
+
+      const previousExpenseId = txn.matchedExpense?.id ?? null;
+      const { expenseId, score } = this.bestMatch(
+        { amount: Number(txn.amount), transactionDate: txn.transactionDate, rawDescription: txn.rawDescription },
+        candidates,
+      );
+      const status =
+        expenseId && score >= AUTO_MATCH_THRESHOLD
+          ? BankTxnStatus.AUTO_MATCHED
+          : expenseId && score >= REVIEW_THRESHOLD
+          ? BankTxnStatus.REVIEW_REQUIRED
+          : BankTxnStatus.UNMATCHED;
+
+      await this.prisma.bankTransaction.update({
+        where: { id: txn.id },
+        data: {
+          status,
+          matchedExpenseId: status === BankTxnStatus.UNMATCHED ? null : expenseId,
+          matchScore: status === BankTxnStatus.UNMATCHED ? null : score,
+        },
+      });
+
+      if (status === BankTxnStatus.AUTO_MATCHED && expenseId) {
+        await this.afterMatchChange(expenseId);
+      }
+      if (previousExpenseId && previousExpenseId !== expenseId) {
+        await this.afterMatchChange(previousExpenseId);
+      }
+    }
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'REMATCH',
+      objectType: 'BankSettlementBatch',
+      objectId: batchId,
+      newValue: { fileName: batch.fileName },
+    });
+
+    return { ...(await this.findBatch(batchId)), alreadyScanned: true };
+  }
+
   async manualMatch(transactionId: string, expenseId: string, actorId: string) {
     const txn = await this.getTxnOrThrow(transactionId);
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });

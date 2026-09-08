@@ -358,6 +358,14 @@ export class ApprovalsService {
     actorPermissions: string[] = [],
     filter?: { podId?: string; fromDate?: string; toDate?: string },
   ) {
+    // BOD is (almost always) the last step in a chain - being able to see an
+    // Expense that's still stuck on an earlier approver's turn, before it's
+    // BOD's own turn, lets a BOD user monitor the pipeline without being able
+    // to act on it yet (the caller-must-be-currentStep's-resolvedApprover
+    // check in approve()/reject() still gates the actual action).
+    const actorPosition = await this.prisma.user.findUnique({ where: { id: actorId }, select: { position: { select: { code: true } } } });
+    const isBod = actorPosition?.position?.code === 'BOD';
+
     const orConditions: Prisma.ApprovalRequestStepWhereInput[] = [{ resolvedApproverId: actorId }];
 
     if (actorPermissions.includes('expense.approve.all')) {
@@ -406,9 +414,17 @@ export class ApprovalsService {
     });
     const seen = new Set<string>();
     return steps
-      .filter((s) => s.approvalRequest.status === ApprovalStatus.PENDING && s.stepOrder === s.approvalRequest.currentStep)
+      .filter((s) => s.approvalRequest.status === ApprovalStatus.PENDING)
+      .filter((s) => {
+        const isMyTurn = s.stepOrder === s.approvalRequest.currentStep;
+        if (isMyTurn) return true;
+        // Everyone else (non-BOD, or a permission-override match rather than
+        // this exact step's own resolvedApprover) only ever sees what's
+        // actionable right now, same as before.
+        return isBod && s.resolvedApproverId === actorId;
+      })
       .filter((s) => (seen.has(s.approvalRequestId) ? false : seen.add(s.approvalRequestId)))
-      .map((s) => s.approvalRequest);
+      .map((s) => ({ ...s.approvalRequest, isMyTurn: s.stepOrder === s.approvalRequest.currentStep }));
   }
 
   async findByExpense(expenseId: string) {
