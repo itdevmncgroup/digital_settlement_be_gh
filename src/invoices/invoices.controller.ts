@@ -22,6 +22,7 @@ import { CreateInvoiceDto, UpdateInvoiceDto } from './dto/invoice.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/permissions.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
@@ -42,6 +43,7 @@ export class InvoicesController {
   // parsed items/totals can pre-fill the form before anything is saved.
   @Post('invoices/ocr-scan')
   @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @RequirePermission('expense.create.all', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -61,6 +63,7 @@ export class InvoicesController {
 
   @Post('expenses/:expenseId/invoices')
   @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @RequirePermission('expense.create.all', 'expense.create.owndept')
   create(@Param('expenseId') expenseId: string, @Body() dto: CreateInvoiceDto, @CurrentUser() actor: AuthUser) {
     return this.service.createForExpense(expenseId, dto, actor.userId, actor.roles);
   }
@@ -78,6 +81,7 @@ export class InvoicesController {
 
   @Post('invoices/:id/files')
   @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @RequirePermission('expense.create.all', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

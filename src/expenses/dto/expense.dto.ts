@@ -60,10 +60,6 @@ export class CreateExpenseDto {
 
   @IsOptional()
   @IsString()
-  podId?: string;
-
-  @IsOptional()
-  @IsString()
   departmentId?: string;
 
   @IsOptional()

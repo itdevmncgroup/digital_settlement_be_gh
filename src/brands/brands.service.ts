@@ -11,7 +11,7 @@ export class BrandsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
   // advertiserIds narrows to Brands owned by any of those Advertisers (used by the
-  // POD picker's Agency -> Advertiser -> Brand cascade). Results are capped since
+  // Department picker's Agency -> Advertiser -> Brand cascade). Results are capped since
   // Brand can run into the thousands - search/advertiserIds narrows it down.
   findAll(filter: { search?: string; advertiserIds?: string[] } = {}) {
     return this.prisma.brand.findMany({

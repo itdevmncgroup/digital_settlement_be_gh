@@ -40,13 +40,13 @@ export class ExpensesController {
     @Query('status') status?: ExpenseStatus | 'ALL',
     @Query('salesId') salesId?: string,
     @Query('unitId') unitId?: string,
-    @Query('podId') podId?: string,
+    @Query('departmentId') departmentId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('matched') matched?: 'MATCHED' | 'UNMATCHED',
     @Query('search') search?: string,
   ) {
-    return this.service.findAll(actor, { status, salesId, unitId, podId, fromDate, toDate, matched, search });
+    return this.service.findAll(actor, { status, salesId, unitId, departmentId, fromDate, toDate, matched, search });
   }
 
   @Get('export/xlsx')
@@ -56,13 +56,13 @@ export class ExpensesController {
     @Query('status') status?: ExpenseStatus | 'ALL',
     @Query('salesId') salesId?: string,
     @Query('unitId') unitId?: string,
-    @Query('podId') podId?: string,
+    @Query('departmentId') departmentId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('matched') matched?: 'MATCHED' | 'UNMATCHED',
     @Query('search') search?: string,
   ) {
-    const buffer = await this.service.exportWorkbook(actor, { status, salesId, unitId, podId, fromDate, toDate, matched, search });
+    const buffer = await this.service.exportWorkbook(actor, { status, salesId, unitId, departmentId, fromDate, toDate, matched, search });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="expenses-${new Date().toISOString().slice(0, 10)}.xlsx"`);
     res.send(buffer);
@@ -75,9 +75,9 @@ export class ExpensesController {
 
   @Post()
   @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
-  @RequirePermission('expense.create')
+  @RequirePermission('expense.create.all', 'expense.create.owndept')
   create(@Body() dto: CreateExpenseDto, @CurrentUser() actor: AuthUser) {
-    return this.service.create(dto, actor.userId, actor.roles);
+    return this.service.create(dto, actor.userId, actor.roles, actor.permissions);
   }
 
   @Patch(':id')
@@ -89,6 +89,7 @@ export class ExpensesController {
 
   @Post(':id/photos')
   @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @RequirePermission('expense.create.all', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

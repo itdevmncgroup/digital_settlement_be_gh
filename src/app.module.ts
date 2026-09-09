@@ -17,7 +17,6 @@ import { PositionsModule } from './positions/positions.module';
 import { AgenciesModule } from './agencies/agencies.module';
 import { AdvertisersModule } from './advertisers/advertisers.module';
 import { BrandsModule } from './brands/brands.module';
-import { PodsModule } from './pods/pods.module';
 import { SalesAssignmentsModule } from './sales-assignments/sales-assignments.module';
 import { ActivityTypesModule } from './activity-types/activity-types.module';
 import { CostCentersModule } from './cost-centers/cost-centers.module';
@@ -35,6 +34,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ImportModule } from './import/import.module';
 import { BankMatchingModule } from './bank-matching/bank-matching.module';
 import { SettlementsModule } from './settlements/settlements.module';
+import { ExternalSyncModule } from './external-sync/external-sync.module';
 
 @Module({
   imports: [
@@ -60,7 +60,6 @@ import { SettlementsModule } from './settlements/settlements.module';
     AgenciesModule,
     AdvertisersModule,
     BrandsModule,
-    PodsModule,
     SalesAssignmentsModule,
     ActivityTypesModule,
     CostCentersModule,
@@ -78,6 +77,7 @@ import { SettlementsModule } from './settlements/settlements.module';
     ImportModule,
     BankMatchingModule,
     SettlementsModule,
+    ExternalSyncModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

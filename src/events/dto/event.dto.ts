@@ -30,12 +30,12 @@ export class CreateEventDto {
   @IsString()
   salesId?: string;
 
-  // Which POD this Pre-Event falls under - determines the POD-scoped Approval
-  // Level chain (e.g. "Head POD -> Supervisor"). Optional: a Sales with exactly
-  // one POD has it inferred; otherwise required.
+  // Which Department this Pre-Event falls under - determines the
+  // Department-scoped Approval Level chain (e.g. "Head -> Supervisor").
+  // Optional: defaults to the target Sales' own Department.
   @IsOptional()
   @IsString()
-  podId?: string;
+  departmentId?: string;
 
   @IsString()
   advertiserId: string;
@@ -89,7 +89,7 @@ export class UpdateEventDto {
 
   @IsOptional()
   @IsString()
-  podId?: string;
+  departmentId?: string;
 
   @IsOptional()
   @IsString()

@@ -2,19 +2,20 @@ import { ArrayNotEmpty, IsArray, IsDateString, IsOptional, IsString } from 'clas
 
 // Admin/Finance only - create on behalf of another Sales, same "on behalf" pattern
 // as CreateExpenseDto.salesId. Ignored for a plain Sales caller, who can only ever
-// create settlements for their own PODs.
+// create settlements for their own Department.
 export class CreateSettlementDto {
   @IsOptional()
   @IsString()
   salesId?: string;
 }
 
-// Backs the Settlement page's "Create Settlement" popup: pick one POD + a date
-// range, generate one Settlement scoped to just that POD/range. A plain Sales
-// caller may only target a POD they're a member of (enforced in the service).
+// Backs the Settlement page's "Create Settlement" popup: pick one Department +
+// a date range, generate one Settlement scoped to just that
+// Department/range. A plain Sales caller may only target their own
+// Department (enforced in the service).
 export class GenerateSettlementDto {
   @IsString()
-  podId!: string;
+  departmentId!: string;
 
   @IsDateString()
   fromDate!: string;
@@ -23,9 +24,9 @@ export class GenerateSettlementDto {
   toDate!: string;
 }
 
-// Adds already-eligible Expenses (SETTLED, matched, same POD, not yet grouped)
-// to an existing DRAFT Settlement - the "add to existing settlement" action on
-// the web admin Settlement page.
+// Adds already-eligible Expenses (SETTLED, matched, same Department, not yet
+// grouped) to an existing DRAFT Settlement - the "add to existing settlement"
+// action on the web admin Settlement page.
 export class AddExpensesToSettlementDto {
   @IsArray()
   @ArrayNotEmpty()
@@ -37,7 +38,7 @@ export class AddExpensesToSettlementDto {
 // committed as a brand-new Settlement instead of growing an existing DRAFT one.
 export class CreateSettlementFromSelectionDto {
   @IsString()
-  podId!: string;
+  departmentId!: string;
 
   @IsArray()
   @ArrayNotEmpty()

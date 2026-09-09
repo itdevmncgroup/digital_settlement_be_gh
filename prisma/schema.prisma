@@ -55,14 +55,13 @@ model User {
 
   roles         UserRole[]
 
-  podMemberships       PodMember[]        @relation("PodMemberSales")
   salesAssignments     SalesAssignment[]  @relation("AssignmentSales")
   events               Event[]            @relation("EventSales")
   expenses             Expense[]          @relation("ExpenseSales")
   invoicesModified     Invoice[]          @relation("InvoiceModifiedBy")
   approvalActions      ApprovalAction[]   @relation("ApprovalActor")
   approvalRequestSteps ApprovalRequestStep[] @relation("ApprovalStepApprover")
-  podApproverOf        PodPositionAssignment[] @relation("PodPositionUser")
+  departmentApproverOf DepartmentPositionAssignment[] @relation("DepartmentPositionUser")
   auditLogs            AuditLog[]
   bankSettlementBatches BankSettlementBatch[] @relation("BatchUploadedBy")
   bankTransactionsMatched BankTransaction[]   @relation("BankTxnMatchedBy")
@@ -121,16 +120,25 @@ model UserRole {
 // Master Data (BRD section 16)
 // ---------------------------------------------------------------------------
 
+// Department = an org department AND/OR a named Sales coverage group (formerly
+// the separate "Pod" concept - "POD 1".."POD 10" are Department rows just like
+// "Sales & Marketing"). Coverage (which Agency<->Brand pairs it covers) is
+// DepartmentAssignment; per-department approvers (e.g. "Head" for a specific
+// Department) is DepartmentPositionAssignment. Membership - which Sales
+// belongs to a Department - is simply User.departmentId, not a join table.
 model Department {
   id        String   @id @default(uuid())
-  code      String   @unique
-  name      String
+  code      String?  @unique
+  name      String   @unique
   isActive  Boolean  @default(true)
   users     User[]
   events    Event[]
   expenses  Expense[]
   approvalLevels ApprovalLevel[]
   settlements Settlement[]
+  assignments DepartmentAssignment[]
+  approvers   DepartmentPositionAssignment[]
+  creditCard  CreditCard?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -144,7 +152,7 @@ model Position {
   isActive  Boolean  @default(true)
   users     User[]
   levelSteps        ApprovalLevelStep[]
-  podAssignments    PodPositionAssignment[]
+  departmentApprovers DepartmentPositionAssignment[]
   requestSteps      ApprovalRequestStep[]
   actionsAsPosition ApprovalAction[]
   createdAt DateTime @default(now())
@@ -153,22 +161,21 @@ model Position {
   @@map("positions")
 }
 
-// Who holds a given Position for a specific POD - needed because "Head POD"
-// differs per POD (Pod 1's Head POD != Pod 2's Head POD), unlike Department
-// positions which resolve directly off User.departmentId.
-model PodPositionAssignment {
-  id         String   @id @default(uuid())
-  podId      String
-  pod        Pod      @relation(fields: [podId], references: [id], onDelete: Cascade)
-  positionId String
-  position   Position @relation(fields: [positionId], references: [id])
-  userId     String
-  user       User     @relation("PodPositionUser", fields: [userId], references: [id])
-  status     String   @default("ACTIVE")
-  createdAt  DateTime @default(now())
+// Who holds a given Position for a specific Department - needed because e.g.
+// "Head" differs per Department (Department 1's Head != Department 2's Head).
+model DepartmentPositionAssignment {
+  id           String     @id @default(uuid())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  positionId   String
+  position     Position   @relation(fields: [positionId], references: [id])
+  userId       String
+  user         User       @relation("DepartmentPositionUser", fields: [userId], references: [id])
+  status       String     @default("ACTIVE")
+  createdAt    DateTime   @default(now())
 
-  @@unique([podId, positionId])
-  @@map("pod_position_assignments")
+  @@unique([departmentId, positionId])
+  @@map("department_position_assignments")
 }
 
 model Unit {
@@ -197,7 +204,7 @@ model Agency {
   name        String
   isActive    Boolean      @default(true)
   advertisers Advertiser[]
-  podAssignments PodAssignment[]
+  departmentAssignments DepartmentAssignment[]
   expenseAgencies ExpenseAgency[]
   participants ExpenseParticipant[]
   createdAt   DateTime     @default(now())
@@ -231,7 +238,7 @@ model Brand {
   isActive      Boolean         @default(true)
   advertiserId  String
   advertiser    Advertiser      @relation(fields: [advertiserId], references: [id])
-  podAssignments PodAssignment[]
+  departmentAssignments DepartmentAssignment[]
   events        Event[]
   expenses      Expense[]
   expenseBrands ExpenseBrand[]
@@ -244,86 +251,45 @@ model Brand {
 // Credit Card master data - Sales pick the company card used to pay for an
 // Expense (BR: card is master-managed, not free text, so Finance can reconcile
 // against the bank settlement PDF via AutoMatching).
-// 1 POD = 1 credit card: a Sales in a given POD may only spend on that POD's
-// own card. podId is unique so a card can't be assigned to more than one POD.
+// 1 Department = 1 credit card: a Sales in a given Department may only spend
+// on that Department's own card. departmentId is unique so a card can't be
+// assigned to more than one Department.
 model CreditCard {
-  id             String    @id @default(uuid())
+  id             String      @id @default(uuid())
   bank           String
   last4          String
   cardHolderName String
-  isActive       Boolean   @default(true)
-  podId          String?   @unique
-  pod            Pod?      @relation(fields: [podId], references: [id])
+  isActive       Boolean     @default(true)
+  departmentId   String?     @unique
+  department     Department? @relation(fields: [departmentId], references: [id])
   expenses       Expense[]
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@map("credit_cards")
 }
 
-// POD = a named coverage group covering multiple Sales (BRD section 6.2),
-// containing multiple Agency <-> Brand pairings: pick an Agency, pick one or
-// more of its Advertisers, pick one or more Brands under those Advertisers -
-// each selected Brand becomes one PodAssignment row tagged with that Agency.
-// A Brand can only appear once per POD (enforced by PodAssignment's
-// @@unique([podId, brandId])), but one Agency can cover many Brands within
-// the same POD. Membership (which Sales cover this POD) is a separate
-// many-to-many via PodMember - a POD is one row regardless of how many Sales
-// cover it.
-model Pod {
-  id       String  @id @default(uuid())
-  name     String  @unique
-  isActive Boolean @default(true)
-
-  members     PodMember[]
-  assignments PodAssignment[]
-  expenses    Expense[]
-  approvers   PodPositionAssignment[]
-  approvalLevels ApprovalLevel[]
-  events      Event[]
-  settlements Settlement[]
-  creditCard  CreditCard?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("pods")
-}
-
-// Which Sales cover a given POD - many-to-many (a POD can have several Sales,
-// and in principle a Sales could cover more than one POD).
-model PodMember {
-  id        String   @id @default(uuid())
-  podId     String
-  pod       Pod      @relation(fields: [podId], references: [id], onDelete: Cascade)
-  salesId   String
-  sales     User     @relation("PodMemberSales", fields: [salesId], references: [id])
-  createdAt DateTime @default(now())
-
-  @@unique([podId, salesId])
-  @@map("pod_members")
-}
-
-// One Agency <-> Brand pairing within a POD. A POD can cover multiple Brands
-// under the same Agency (e.g. picking several Advertisers under an Agency, then
-// several Brands under those) - uniqueness is per Brand, not per Agency, so the
-// same Brand can't be added twice to one POD. The paired Brand's actual
-// Advertiser/Agency ownership chain is validated against agencyId at the service
-// layer (PodsService) - schema can't express that cross-relation check.
-model PodAssignment {
-  id            String    @id @default(uuid())
-  podId         String
-  pod           Pod       @relation(fields: [podId], references: [id], onDelete: Cascade)
+// One Agency <-> Brand pairing within a Department. A Department can cover
+// multiple Brands under the same Agency (e.g. picking several Advertisers
+// under an Agency, then several Brands under those) - uniqueness is per
+// Brand, not per Agency, so the same Brand can't be added twice to one
+// Department. The paired Brand's actual Advertiser/Agency ownership chain is
+// validated against agencyId at the service layer (DepartmentsService) -
+// schema can't express that cross-relation check.
+model DepartmentAssignment {
+  id            String     @id @default(uuid())
+  departmentId  String
+  department    Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   agencyId      String
-  agency        Agency    @relation(fields: [agencyId], references: [id])
+  agency        Agency     @relation(fields: [agencyId], references: [id])
   brandId       String
-  brand         Brand     @relation(fields: [brandId], references: [id])
-  effectiveDate DateTime  @default(now())
+  brand         Brand      @relation(fields: [brandId], references: [id])
+  effectiveDate DateTime   @default(now())
   endDate       DateTime?
-  status        String    @default("ACTIVE")
+  status        String     @default("ACTIVE")
 
-  @@unique([podId, brandId])
-  @@map("pod_assignments")
+  @@unique([departmentId, brandId])
+  @@map("department_assignments")
 }
 
 // Sales <-> Unit assignment history (BRD section 27)
@@ -407,8 +373,6 @@ model Event {
   sales             User         @relation("EventSales", fields: [salesId], references: [id])
   unitId            String
   unit              Unit         @relation(fields: [unitId], references: [id])
-  podId             String?
-  pod               Pod?         @relation(fields: [podId], references: [id])
   departmentId      String?
   department        Department?  @relation(fields: [departmentId], references: [id])
   advertiserId      String
@@ -474,12 +438,32 @@ enum ExpenseStatus {
   APPROVAL_DEPT_HEAD
   APPROVAL_DIV_HEAD
   APPROVAL_BOD
+  // Position codes carrying "-" (CO-CSO-1) are normalised to "_" before the
+  // APPROVAL_<code> lookup - see ApprovalsService.pendingStatusForPosition.
+  APPROVAL_CO_CSO_1
+  APPROVAL_CO_CSO_2
+  // DocumentStage.SETTLEMENT tier - the same Expense continues into this second
+  // chain once a Settlement is created from it (SettlementsService), so its
+  // status keeps naming whoever is reviewing it right now.
+  APPROVAL_SLS_MAR_DIR
+  APPROVAL_VP_ACC_BIL_TAX_3TV
+  APPROVAL_CO_CFO_3TV
   // No longer produced by new code (final approval step now sets SETTLED
   // directly, no manual Finance settle) - kept for historical rows only.
   APPROVED
   REJECTED
   REVISION
+  // Terminal of the DocumentStage.EXPENSES chain (HEAD_POD -> CO-CSO-1 ->
+  // CO-CSO-2): approved, now waiting for Sales Admin to bank-match it.
+  READY_TO_MATCHING
+  // Bank-matched - waiting to be grouped into a Settlement.
+  READY_TO_SETTLED
+  // Superseded by READY_TO_MATCHING/READY_TO_SETTLED - historical rows only.
   SETTLED
+  // Terminal of the Settlement chain (SLS_MAR_DIR -> VP -> CO_CFO), set when
+  // that Settlement's final tier is submitted - the batch is then pushed to the
+  // external system (ExternalSyncService).
+  COMPLETE
 }
 
 enum PaymentMethodType {
@@ -500,8 +484,6 @@ model Expense {
   sales           User          @relation("ExpenseSales", fields: [salesId], references: [id])
   unitId          String
   unit            Unit          @relation(fields: [unitId], references: [id])
-  podId           String?
-  pod             Pod?          @relation(fields: [podId], references: [id])
   departmentId    String?
   department      Department?   @relation(fields: [departmentId], references: [id])
   advertiserId    String
@@ -540,6 +522,12 @@ model Expense {
   isMatched       Boolean       @default(false)
   settlementId    String?
   settlement      Settlement?   @relation(fields: [settlementId], references: [id])
+  // Highest Settlement-chain step (0-based) this Expense has been individually
+  // approved at by that tier's approver. The Settlement's Submit is only allowed
+  // once every member Expense has been reviewed at the current tier, i.e.
+  // settlementApprovedStep >= approvalRequest.currentStep. Null = not yet
+  // reviewed at any tier.
+  settlementApprovedStep Int?
 
   items           ExpenseItem[]
   invoices        Invoice[]
@@ -756,7 +744,6 @@ enum DocumentStage {
 
 enum ApprovalScopeType {
   ANY
-  POD
   DEPARTMENT
 }
 
@@ -765,8 +752,6 @@ model ApprovalLevel {
   name          String
   documentStage DocumentStage
   scopeType     ApprovalScopeType @default(ANY)
-  podId         String?
-  pod           Pod?              @relation(fields: [podId], references: [id])
   departmentId  String?
   department    Department?       @relation(fields: [departmentId], references: [id])
   minAmount     Decimal           @db.Decimal(18, 2) @default(0)
@@ -799,6 +784,12 @@ model ApprovalRequest {
   expense         Expense?       @relation(fields: [expenseId], references: [id], onDelete: Cascade)
   eventId         String?        @unique
   event           Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // DocumentStage.SETTLEMENT - the batch's own chain (SLS_MAR_DIR -> VP ->
+  // CO_CFO). A tier advances only when its approver presses Submit on the
+  // Settlement, after reviewing each member Expense individually
+  // (Expense.settlementApprovedStep).
+  settlementId    String?        @unique
+  settlement      Settlement?    @relation(fields: [settlementId], references: [id], onDelete: Cascade)
   approvalLevelId String
   approvalLevel   ApprovalLevel  @relation(fields: [approvalLevelId], references: [id])
   currentStep     Int            @default(0)
@@ -902,23 +893,26 @@ model BankTransaction {
   @@map("bank_transactions")
 }
 
-// Groups a POD's already-matched (bank-reconciled) Expenses into one settlement
-// batch - one Settlement per POD per "Create Settlement" click (a Sales/Admin
-// covering several PODs gets one Settlement per POD with eligible Expenses).
+// Groups a Department's already-matched (bank-reconciled) Expenses into one
+// settlement batch - one Settlement per Department per "Create Settlement"
+// click (a Sales/Admin covering several Departments gets one Settlement per
+// Department with eligible Expenses).
 // settlementNo format: STL-YYMMDD#### (see SettlementsService.generateSettlementNo).
 model Settlement {
   id             String      @id @default(uuid())
   settlementNo   String      @unique
-  podId          String
-  pod            Pod         @relation(fields: [podId], references: [id])
-  // Null when the grouped Expenses don't all share the same Department.
-  departmentId   String?
-  department     Department? @relation(fields: [departmentId], references: [id])
+  departmentId   String
+  department     Department  @relation(fields: [departmentId], references: [id])
   totalAmount    Decimal     @db.Decimal(18, 2)
   status         SettlementStatus @default(DRAFT)
   createdById    String
   createdBy      User        @relation("SettlementCreatedBy", fields: [createdById], references: [id])
   expenses       Expense[]
+  approvalRequest ApprovalRequest?
+  // Set once the Settlement's final tier is submitted and the batch has been
+  // pushed to the external system - the guard that keeps ExternalSyncService
+  // from sending the same Settlement twice.
+  externalSyncedAt DateTime?
   createdAt      DateTime    @default(now())
 
   @@map("settlements")
@@ -926,7 +920,15 @@ model Settlement {
 
 enum SettlementStatus {
   DRAFT
+  // Mirrors whichever tier of the Settlement's own approval chain is reviewing
+  // the batch right now - the member Expenses carry the matching
+  // ExpenseStatus.APPROVAL_* value, and both advance together when that tier's
+  // approver presses Submit (SettlementsService.submitCurrentTier).
+  APPROVAL_SLS_MAR_DIR
+  APPROVAL_VP_ACC_BIL_TAX_3TV
+  APPROVAL_CO_CFO_3TV
   COMPLETE
+  REJECTED
 }
 
 // ---------------------------------------------------------------------------

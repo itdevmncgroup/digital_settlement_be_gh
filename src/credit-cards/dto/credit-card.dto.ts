@@ -15,10 +15,11 @@ export class CreateCreditCardDto {
   @IsBoolean()
   isActive?: boolean;
 
-  // 1 POD = 1 credit card - a Sales in this POD may only spend on this card.
+  // 1 Department = 1 credit card - a Sales in this Department may only spend
+  // on this card.
   @IsOptional()
   @IsString()
-  podId?: string;
+  departmentId?: string;
 }
 
 export class UpdateCreditCardDto {
@@ -41,5 +42,5 @@ export class UpdateCreditCardDto {
 
   @IsOptional()
   @IsString()
-  podId?: string;
+  departmentId?: string;
 }

@@ -8,7 +8,32 @@ import { canAccessExpenseOwnedRecord } from '../common/rbac/scope.util';
 import { CreateInvoiceDto, UpdateInvoiceDto } from './dto/invoice.dto';
 
 const include = { merchant: true, files: true, modifiedBy: { select: { id: true, name: true } } } as const;
-const EDITABLE_STATUSES: ExpenseStatus[] = [ExpenseStatus.DRAFT, ExpenseStatus.REJECTED, ExpenseStatus.REVISION];
+// Expense.create() enters the approval chain immediately - no DRAFT-first flow
+// (see ExpensesService.create) - so a brand-new Expense already sits at
+// APPROVAL_HEAD_POD (or another tier's PENDING_APPROVAL/APPROVAL_* status) by
+// the time the client attaches its Invoice right after. Those pre-terminal
+// statuses must stay editable here, same as Expense photo upload's
+// LOCKED_STATUSES gate, on top of the original DRAFT/REJECTED/REVISION set.
+const EDITABLE_STATUSES: ExpenseStatus[] = [
+  ExpenseStatus.DRAFT,
+  ExpenseStatus.REJECTED,
+  ExpenseStatus.REVISION,
+  ExpenseStatus.PROCESSING,
+  ExpenseStatus.OCR_COMPLETED,
+  ExpenseStatus.MATCHING,
+  ExpenseStatus.NEEDS_REVIEW,
+  ExpenseStatus.READY_TO_SUBMIT,
+  ExpenseStatus.SUBMITTED,
+  ExpenseStatus.PENDING_APPROVAL,
+  ExpenseStatus.APPROVAL_HEAD_POD,
+  ExpenseStatus.APPROVAL_KOORDINATOR,
+  ExpenseStatus.APPROVAL_SUPERVISOR,
+  ExpenseStatus.APPROVAL_DEPT_HEAD,
+  ExpenseStatus.APPROVAL_DIV_HEAD,
+  ExpenseStatus.APPROVAL_BOD,
+  ExpenseStatus.APPROVAL_CO_CSO_1,
+  ExpenseStatus.APPROVAL_CO_CSO_2,
+];
 
 @Injectable()
 export class InvoicesService {
@@ -21,7 +46,7 @@ export class InvoicesService {
   async findOne(id: string, actor: AuthUser) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
-      include: { ...include, expense: { select: { id: true, expenseNo: true, salesId: true, podId: true } } },
+      include: { ...include, expense: { select: { id: true, expenseNo: true, salesId: true, departmentId: true } } },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
     await this.assertCanAccess(invoice.expense, actor);
@@ -122,7 +147,7 @@ export class InvoicesService {
   async getFileForDownload(fileId: string, actor: AuthUser) {
     const file = await this.prisma.invoiceFile.findUnique({
       where: { id: fileId },
-      include: { invoice: { include: { expense: { select: { salesId: true, podId: true } } } } },
+      include: { invoice: { include: { expense: { select: { salesId: true, departmentId: true } } } } },
     });
     if (!file) throw new NotFoundException('File not found');
     await this.assertCanAccess(file.invoice.expense, actor);
@@ -132,7 +157,7 @@ export class InvoicesService {
     return { path: this.storage.resolvePath(file.storageKey), fileName: file.fileName, mimeType: file.mimeType };
   }
 
-  private async assertCanAccess(owner: { salesId: string; podId?: string | null }, actor: AuthUser) {
+  private async assertCanAccess(owner: { salesId: string; departmentId?: string | null }, actor: AuthUser) {
     if (!(await canAccessExpenseOwnedRecord(this.prisma, actor, owner))) {
       throw new ForbiddenException('Not authorized to access this invoice');
     }

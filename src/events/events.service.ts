@@ -8,7 +8,6 @@ import { CreateEventDto, UpdateEventDto } from './dto/event.dto';
 const include = {
   sales: { select: { id: true, name: true, employeeId: true } },
   unit: true,
-  pod: true,
   department: true,
   advertiser: { include: { agency: true } },
   brand: true,
@@ -70,13 +69,10 @@ export class EventsService {
       throw new BadRequestException('Sales has no active Unit assignment');
     }
 
-    // POD determines the POD-scoped Approval Level chain (BRD section 22-23 example).
-    // If not given explicitly and the Sales covers exactly one POD, infer it.
-    let podId = dto.podId;
-    if (!podId) {
-      const pods = await this.prisma.pod.findMany({ where: { members: { some: { salesId: targetSalesId } } }, select: { id: true } });
-      if (pods.length === 1) podId = pods[0].id;
-    }
+    // Department determines the Department-scoped Approval Level chain (BRD
+    // section 22-23 example). Defaults to the target Sales' own Department,
+    // overridable via dto.departmentId.
+    const departmentId = dto.departmentId ?? sales.departmentId;
 
     const eventNo = await this.generateEventNo();
 
@@ -85,8 +81,7 @@ export class EventsService {
         eventNo,
         salesId: targetSalesId,
         unitId: sales.unitId,
-        podId,
-        departmentId: sales.departmentId,
+        departmentId,
         advertiserId: dto.advertiserId,
         brandId: dto.brandId,
         activityTypeId: dto.activityTypeId,
@@ -138,8 +133,7 @@ export class EventsService {
         data: {
           salesId,
           unitId,
-          departmentId,
-          podId: dto.podId,
+          departmentId: dto.departmentId ?? departmentId,
           advertiserId: dto.advertiserId,
           brandId: dto.brandId,
           activityTypeId: dto.activityTypeId,
@@ -154,15 +148,14 @@ export class EventsService {
         include,
       });
 
-      // The approval chain was resolved against the old POD/Department/amount -
-      // if the event is already SUBMITTED, re-resolve it against the edited
+      // The approval chain was resolved against the old Department/amount - if
+      // the event is already SUBMITTED, re-resolve it against the edited
       // values so it doesn't keep pointing at stale approvers.
       if (before.status === EventStatus.SUBMITTED) {
         await this.approvals.createOrResetRequest(tx, {
           documentStage: DocumentStage.PRE_EVENT,
           eventId: id,
           amount: updated.estimatedAmount,
-          podId: updated.podId,
           departmentId: updated.departmentId,
         });
         return tx.event.findUniqueOrThrow({ where: { id }, include });
@@ -186,7 +179,6 @@ export class EventsService {
         documentStage: DocumentStage.PRE_EVENT,
         eventId: id,
         amount: before.estimatedAmount,
-        podId: before.podId,
         departmentId: before.departmentId,
       });
       return tx.event.update({ where: { id }, data: { status: EventStatus.SUBMITTED }, include });

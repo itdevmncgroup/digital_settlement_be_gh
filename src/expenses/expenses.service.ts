@@ -13,8 +13,8 @@ type ListFilter = {
   salesId?: string;
   status?: ExpenseStatus | 'ALL';
   unitId?: string;
-  podId?: string;
-  podIdIn?: string[];
+  departmentId?: string;
+  departmentIdIn?: string[];
   fromDate?: string;
   toDate?: string;
   matched?: 'MATCHED' | 'UNMATCHED';
@@ -30,7 +30,6 @@ const include = {
   activityType: true,
   costCenter: true,
   creditCard: true,
-  pod: true,
   department: true,
   items: { include: { category: true } },
   invoices: { include: { files: true } },
@@ -82,28 +81,43 @@ export class ExpensesService {
     return this.prisma.expense.findMany({ where: this.buildWhere(filter), include, orderBy: { createdAt: 'desc' } });
   }
 
-  // Back office (Admin/Finance/Supervisor/Management) sees everything, scoped only
-  // by whatever query params they pass. Sales Admin is POD-scoped: not a global
-  // back-office role, but should see every Sales' expense within their own POD(s)
-  // (PodMember - same table Sales use to declare POD coverage), not just their own
-  // records. A plain expense.read.ownpod permission holder (e.g. a HEAD_POD/BOD
-  // Role approving for their POD - PodPositionAssignment, not PodMember) gets the
-  // same POD-wide scoping via whichever of the two tables actually covers them.
-  // Everyone else (plain Sales) only ever sees their own.
+  // Back office (Admin/Finance/Supervisor/Management) sees everything, scoped
+  // only by whatever query params they pass. Sales Admin is Department-scoped:
+  // not a global back-office role, but should see every Sales' expense within
+  // their own Department (their own User.departmentId), not just their own
+  // records. A plain expense.read.owndept permission holder (e.g. a HEAD_POD/
+  // BOD Role approving for their Department - DepartmentPositionAssignment,
+  // not User.departmentId) gets the same Department-wide scoping via whichever
+  // of the two sources actually covers them. Everyone else (plain Sales) only
+  // ever sees their own.
   private async resolveScope(actor: AuthUser, q: ListFilter): Promise<ListFilter> {
     if (canViewAllRecords(actor)) {
       return q;
     }
-    if (actor.roles.includes(RoleName.SALES_ADMIN) || actor.permissions?.includes('expense.read.ownpod')) {
-      const [memberships, assignments] = await Promise.all([
-        this.prisma.podMember.findMany({ where: { salesId: actor.userId }, select: { podId: true } }),
-        this.prisma.podPositionAssignment.findMany({ where: { userId: actor.userId, status: 'ACTIVE' }, select: { podId: true } }),
-      ]);
-      const managedPodIds = Array.from(new Set([...memberships.map((m) => m.podId), ...assignments.map((a) => a.podId)]));
-      const podId = q.podId && managedPodIds.includes(q.podId) ? q.podId : undefined;
-      return { ...q, salesId: undefined, unitId: undefined, podId, podIdIn: podId ? undefined : managedPodIds };
+    if (actor.roles.includes(RoleName.SALES_ADMIN) || actor.permissions?.includes('expense.read.owndept')) {
+      const managedDepartmentIds = await this.getManagedDepartmentIds(actor.userId);
+      // No Department on the actor's own profile and no per-Department assignment
+      // means their position sits above Department level (e.g. Co-Chief Sales
+      // Officer) - they see every Department, same as a back-office role.
+      if (managedDepartmentIds.length === 0) {
+        return q;
+      }
+      const departmentId = q.departmentId && managedDepartmentIds.includes(q.departmentId) ? q.departmentId : undefined;
+      return { ...q, salesId: undefined, unitId: undefined, departmentId, departmentIdIn: departmentId ? undefined : managedDepartmentIds };
     }
     return { ...q, salesId: actor.userId, unitId: undefined };
+  }
+
+  // A caller's "own Department(s)" for *.owndept permissions - either their
+  // profile's own User.departmentId (e.g. SALES_ADMIN) or every Department
+  // they hold an active approval Position for (DepartmentPositionAssignment -
+  // e.g. HEAD_POD), same two sources resolveScope() already reads for listing.
+  private async getManagedDepartmentIds(actorId: string): Promise<string[]> {
+    const [user, assignments] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } }),
+      this.prisma.departmentPositionAssignment.findMany({ where: { userId: actorId, status: 'ACTIVE' }, select: { departmentId: true } }),
+    ]);
+    return Array.from(new Set([...(user?.departmentId ? [user.departmentId] : []), ...assignments.map((a) => a.departmentId)]));
   }
 
   private buildWhere(filter: ListFilter): Prisma.ExpenseWhereInput {
@@ -116,7 +130,7 @@ export class ExpensesService {
       salesId: filter.salesId,
       status: statusFilter,
       unitId: filter.unitId,
-      podId: filter.podIdIn ? { in: filter.podIdIn } : filter.podId,
+      departmentId: filter.departmentIdIn ? { in: filter.departmentIdIn } : filter.departmentId,
       expenseDate:
         filter.fromDate || filter.toDate
           ? {
@@ -161,7 +175,7 @@ export class ExpensesService {
       { header: 'Expense No', key: 'expenseNo', width: 20 },
       { header: 'Date', key: 'date', width: 14 },
       { header: 'Sales', key: 'sales', width: 20 },
-      { header: 'POD', key: 'pod', width: 16 },
+      { header: 'Department', key: 'department', width: 16 },
       { header: 'Advertiser', key: 'advertiser', width: 20 },
       { header: 'Brand', key: 'brand', width: 20 },
       { header: 'Purpose', key: 'purpose', width: 30 },
@@ -175,7 +189,7 @@ export class ExpensesService {
         expenseNo: r.expenseNo,
         date: formatDateDDMMYYYY(r.expenseDate),
         sales: r.sales?.name,
-        pod: r.pod?.name ?? '',
+        department: r.department?.name ?? '',
         advertiser: r.advertiser?.name,
         brand: r.brand?.name,
         purpose: r.purpose,
@@ -204,7 +218,7 @@ export class ExpensesService {
   // Admin/Finance may pass dto.salesId to create on behalf of another Sales (historical /
   // corrective entry, BRD section 5.3) - ignored for a plain Sales caller, who can only
   // ever create their own.
-  async create(dto: CreateExpenseDto, actorId: string, actorRoles: string[]) {
+  async create(dto: CreateExpenseDto, actorId: string, actorRoles: string[], actorPermissions: string[] = []) {
     const targetSalesId = this.isBackOffice(actorRoles) && dto.salesId ? dto.salesId : actorId;
 
     if (!dto.unitId || !dto.advertiserId || !dto.brandId || !dto.activityTypeId) {
@@ -215,10 +229,11 @@ export class ExpensesService {
     const brandId = dto.brandId;
     const activityTypeId = dto.activityTypeId;
     const departmentId = dto.departmentId;
-    const podId = dto.podId;
+
+    await this.assertCanCreateForDepartment(actorId, actorRoles, actorPermissions, departmentId);
 
     if (dto.paymentMethodType === 'CREDIT_CARD' && dto.creditCardId) {
-      await this.assertCreditCardMatchesPod(dto.creditCardId, podId);
+      await this.assertCreditCardMatchesDepartment(dto.creditCardId, departmentId);
     }
 
     const expenseNo = await this.generateExpenseNo();
@@ -228,7 +243,6 @@ export class ExpensesService {
         expenseNo,
         salesId: targetSalesId,
         unitId,
-        podId,
         departmentId,
         advertiserId,
         brandId,
@@ -257,8 +271,16 @@ export class ExpensesService {
       include,
     });
 
+    // Submitting IS creating - the approval chain (HEAD_POD -> CO-CSO-1 ->
+    // CO-CSO-2) starts right away, so a new Expense is never a DRAFT sitting
+    // outside the workflow. Bank matching comes later, once that chain is done
+    // (see BankMatchingService.afterMatchChange).
+    await this.prisma.$transaction((tx) =>
+      this.approvals.enterExpenseApproval(tx, { expenseId: expense.id, amount: expense.amount, departmentId: expense.departmentId }),
+    );
+
     await this.audit.log({ userId: actorId, action: 'CREATE', objectType: 'Expense', objectId: expense.id, newValue: expense });
-    return expense;
+    return this.findOne(expense.id);
   }
 
   async update(id: string, dto: UpdateExpenseDto, actorId: string, actorRoles: string[], actorPermissions: string[] = []) {
@@ -275,7 +297,7 @@ export class ExpensesService {
     const effectivePaymentMethod = dto.paymentMethodType ?? before.paymentMethodType;
     const effectiveCreditCardId = dto.creditCardId ?? before.creditCardId;
     if (effectivePaymentMethod === 'CREDIT_CARD' && effectiveCreditCardId) {
-      await this.assertCreditCardMatchesPod(effectiveCreditCardId, before.podId);
+      await this.assertCreditCardMatchesDepartment(effectiveCreditCardId, before.departmentId);
     }
 
     const expense = await this.prisma.$transaction(async (tx) => {
@@ -328,7 +350,6 @@ export class ExpensesService {
         await this.approvals.enterExpenseApproval(tx, {
           expenseId: id,
           amount: dto.amount ?? before.amount,
-          podId: before.podId,
           departmentId: before.departmentId,
         });
       }
@@ -340,12 +361,13 @@ export class ExpensesService {
     return expense;
   }
 
-  // 1 POD = 1 credit card: a Sales in a given POD may only pay by that POD's own card.
-  private async assertCreditCardMatchesPod(creditCardId: string, podId?: string | null) {
+  // 1 Department = 1 credit card: a Sales in a given Department may only pay
+  // by that Department's own card.
+  private async assertCreditCardMatchesDepartment(creditCardId: string, departmentId?: string | null) {
     const card = await this.prisma.creditCard.findUnique({ where: { id: creditCardId } });
     if (!card) throw new NotFoundException('Credit card not found');
-    if (!card.podId || card.podId !== podId) {
-      throw new BadRequestException("Selected credit card is not assigned to this Sales' POD");
+    if (!card.departmentId || card.departmentId !== departmentId) {
+      throw new BadRequestException("Selected credit card is not assigned to this Sales' Department");
     }
   }
 
@@ -380,7 +402,7 @@ export class ExpensesService {
   async getPhotoForDownload(photoId: string, actor: AuthUser) {
     const photo = await this.prisma.expensePhoto.findUnique({
       where: { id: photoId },
-      include: { expense: { select: { salesId: true, podId: true } } },
+      include: { expense: { select: { salesId: true, departmentId: true } } },
     });
     if (!photo) throw new NotFoundException('Photo not found');
     if (!(await canAccessExpenseOwnedRecord(this.prisma, actor, photo.expense))) {
@@ -410,20 +432,40 @@ export class ExpensesService {
     return actorRoles.some((r) => r === 'ADMIN' || r === 'FINANCE');
   }
 
-  // expense.edit.all / expense.edit.ownpod (Role/Permission master) - .all grants
-  // edit access on any Sales' Expense the same way ADMIN/FINANCE already does;
-  // .ownpod extends that to just the Expenses whose POD the actor is a member of
-  // (PodMember - same table ExpensesService's resolveScope() reads for listing).
+  // expense.create.all / expense.create.owndept (Role/Permission master) - lets
+  // a caller outside the route's @Roles(SALES/ADMIN/FINANCE) gate (e.g. a
+  // HEAD_POD/Management holder wanting to log an Expense on their Department's
+  // behalf) reach ExpensesController.create at all; RolesGuard already OR's that
+  // in. .all is unrestricted like ADMIN/FINANCE; .owndept is only checked here
+  // because the guard can't see *which* departmentId the request body carries -
+  // it must be one of the actor's own (see getManagedDepartmentIds). SALES/
+  // ADMIN/FINANCE (the @Roles gate) stay unrestricted, same as before this
+  // permission pair existed.
+  private async assertCanCreateForDepartment(actorId: string, actorRoles: string[], actorPermissions: string[], departmentId?: string | null) {
+    if (this.isBackOffice(actorRoles) || actorRoles.includes(RoleName.SALES)) return;
+    if (actorPermissions.includes('expense.create.all')) return;
+    if (actorPermissions.includes('expense.create.owndept')) {
+      const managedDepartmentIds = await this.getManagedDepartmentIds(actorId);
+      if (departmentId && managedDepartmentIds.includes(departmentId)) return;
+      throw new ForbiddenException('Cannot create an Expense for a Department outside your own');
+    }
+  }
+
+  // expense.edit.all / expense.edit.owndept (Role/Permission master) - .all
+  // grants edit access on any Sales' Expense the same way ADMIN/FINANCE
+  // already does; .owndept extends that to just the Expenses whose Department
+  // the actor belongs to (User.departmentId - same source ExpensesService's
+  // resolveScope() reads for listing).
   private async canEditExpense(
-    expense: { podId: string | null },
+    expense: { departmentId: string | null },
     actorId: string,
     actorRoles: string[],
     actorPermissions: string[],
   ): Promise<boolean> {
     if (this.isBackOffice(actorRoles) || actorPermissions.includes('expense.edit.all')) return true;
-    if (actorPermissions.includes('expense.edit.ownpod') && expense.podId) {
-      const membership = await this.prisma.podMember.findFirst({ where: { salesId: actorId, podId: expense.podId } });
-      if (membership) return true;
+    if (actorPermissions.includes('expense.edit.owndept') && expense.departmentId) {
+      const actorUser = await this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } });
+      if (actorUser?.departmentId === expense.departmentId) return true;
     }
     return false;
   }

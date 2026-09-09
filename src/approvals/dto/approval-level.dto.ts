@@ -20,10 +20,6 @@ export class CreateApprovalLevelDto {
 
   @IsOptional()
   @IsString()
-  podId?: string;
-
-  @IsOptional()
-  @IsString()
   departmentId?: string;
 
   @IsNumber()
@@ -35,7 +31,7 @@ export class CreateApprovalLevelDto {
   @Min(0)
   maxAmount?: number;
 
-  // Ordered approval chain, e.g. [Head POD, Supervisor] - step order is the array order.
+  // Ordered approval chain, e.g. [Head, Supervisor] - step order is the array order.
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
@@ -51,10 +47,6 @@ export class UpdateApprovalLevelDto {
   @IsOptional()
   @IsEnum(ApprovalScopeType)
   scopeType?: ApprovalScopeType;
-
-  @IsOptional()
-  @IsString()
-  podId?: string;
 
   @IsOptional()
   @IsString()

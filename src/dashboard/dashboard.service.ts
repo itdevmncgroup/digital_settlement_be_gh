@@ -20,14 +20,15 @@ export class DashboardService {
   ) {}
 
   // Personal landing-page dashboard (any authenticated user, not just
-  // Management/Admin/Finance) - unlike summary()/expenseByPod() above, this is
-  // scoped to what the caller's own approval Position entitles them to see:
-  // HEAD_POD -> their POD(s) (PodPositionAssignment), DEPT_HEAD/DIV_HEAD ->
-  // their own Department (no separate Division table - see BRD discussion),
-  // BOD -> company-wide (BOD approval steps are never POD/Department-scoped,
-  // see ApprovalsService.resolveApprover's ANY branch). "Total expense" here
-  // always means SETTLED-only (money actually fully approved), not every
-  // in-flight status like summary()'s unfiltered totalExpense.
+  // Management/Admin/Finance) - unlike summary()/expenseByDepartment() above,
+  // this is scoped to what the caller's own approval Position entitles them
+  // to see: HEAD_POD -> the Department(s) they're an explicit approver for
+  // (DepartmentPositionAssignment), DEPT_HEAD/DIV_HEAD -> their own Department
+  // (no separate Division table - see BRD discussion), BOD -> company-wide
+  // (BOD approval steps are never Department-scoped, see ApprovalsService.
+  // resolveApprover's ANY branch). "Total expense" here always means
+  // SETTLED-only (money actually fully approved), not every in-flight status
+  // like summary()'s unfiltered totalExpense.
   async getMyDashboard(actor: AuthUser) {
     const user = await this.prisma.user.findUnique({
       where: { id: actor.userId },
@@ -41,19 +42,19 @@ export class DashboardService {
     const pendingApprovalCount = pending.filter((p) => p.isMyTurn).length;
 
     if (positionCode === 'HEAD_POD') {
-      const assignments = await this.prisma.podPositionAssignment.findMany({
+      const assignments = await this.prisma.departmentPositionAssignment.findMany({
         where: { userId: actor.userId, position: { code: 'HEAD_POD' }, status: 'ACTIVE' },
-        include: { pod: true },
+        include: { department: true },
       });
-      const podIds = assignments.map((a) => a.podId);
+      const departmentIds = assignments.map((a) => a.departmentId);
       const agg = await this.prisma.expense.aggregate({
-        where: { podId: { in: podIds }, status: ExpenseStatus.SETTLED },
+        where: { departmentId: { in: departmentIds }, status: ExpenseStatus.SETTLED },
         _sum: { amount: true },
       });
       return {
         positionCode,
         pendingApprovalCount,
-        pods: assignments.map((a) => ({ id: a.pod.id, name: a.pod.name })),
+        departments: assignments.map((a) => ({ id: a.department.id, name: a.department.name })),
         totalSettledAmount: agg._sum.amount ?? 0,
       };
     }
@@ -88,29 +89,32 @@ export class DashboardService {
     return { positionCode, pendingApprovalCount };
   }
 
-  // dashboard.read.all / dashboard.read.ownpod (Role/Permission master) scope
-  // every report below by POD: undefined = no restriction (back-office role or
-  // the .all permission), otherwise the caller's own PODs (PodMember team
-  // coverage + PodPositionAssignment approver coverage - same dual source
-  // canAccessExpenseOwnedRecord() already uses for the equivalent expense.*.ownpod
-  // permissions), or [] if the caller somehow holds neither (guard should have
-  // already blocked that, this is just a defensive "see nothing").
-  private async resolvePodScope(actor: AuthUser): Promise<string[] | undefined> {
+  // dashboard.read.all / dashboard.read.owndept (Role/Permission master) scope
+  // every report below by Department: undefined = no restriction (back-office
+  // role or the .all permission), otherwise the caller's own Department(s)
+  // (their own User.departmentId + DepartmentPositionAssignment approver
+  // coverage - same dual source canAccessExpenseOwnedRecord() already uses
+  // for the equivalent expense.*.owndept permissions), or [] if the caller
+  // somehow holds neither (guard should have already blocked that, this is
+  // just a defensive "see nothing").
+  private async resolveDepartmentScope(actor: AuthUser): Promise<string[] | undefined> {
     if (canViewAllRecords(actor) || actor.permissions?.includes('dashboard.read.all')) return undefined;
-    if (actor.permissions?.includes('dashboard.read.ownpod')) {
-      const [memberships, assignments] = await Promise.all([
-        this.prisma.podMember.findMany({ where: { salesId: actor.userId }, select: { podId: true } }),
-        this.prisma.podPositionAssignment.findMany({ where: { userId: actor.userId, status: 'ACTIVE' }, select: { podId: true } }),
+    if (actor.permissions?.includes('dashboard.read.owndept')) {
+      const [user, assignments] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: actor.userId }, select: { departmentId: true } }),
+        this.prisma.departmentPositionAssignment.findMany({ where: { userId: actor.userId, status: 'ACTIVE' }, select: { departmentId: true } }),
       ]);
-      return Array.from(new Set([...memberships.map((m) => m.podId), ...assignments.map((a) => a.podId)]));
+      const ids = new Set(assignments.map((a) => a.departmentId));
+      if (user?.departmentId) ids.add(user.departmentId);
+      return Array.from(ids);
     }
     return [];
   }
 
-  private buildWhere(filter: PeriodFilter, podIds?: string[]) {
+  private buildWhere(filter: PeriodFilter, departmentIds?: string[]) {
     return {
       unitId: filter.unitId,
-      podId: podIds ? { in: podIds } : undefined,
+      departmentId: departmentIds ? { in: departmentIds } : undefined,
       expenseDate: {
         gte: filter.from ? new Date(filter.from) : undefined,
         lte: filter.to ? new Date(filter.to) : undefined,
@@ -119,8 +123,8 @@ export class DashboardService {
   }
 
   async summary(actor: AuthUser, filter: PeriodFilter) {
-    const podIds = await this.resolvePodScope(actor);
-    const where = this.buildWhere(filter, podIds);
+    const departmentIds = await this.resolveDepartmentScope(actor);
+    const where = this.buildWhere(filter, departmentIds);
 
     const [totalAgg, statusCounts] = await Promise.all([
       this.prisma.expense.aggregate({ where, _sum: { amount: true }, _count: true, _avg: { amount: true } }),
@@ -163,31 +167,32 @@ export class DashboardService {
     return this.groupByRelation(actor, filter, 'brandId', 'brand');
   }
 
-  // POD = a named coverage group covering one or more Sales (BRD section 6.2) -
-  // grouped by Expense.podId, matching the requested "POD | TRANSACTION | TOTAL" report shape.
-  async expenseByPod(actor: AuthUser, filter: PeriodFilter) {
-    const scopedPodIds = await this.resolvePodScope(actor);
+  // Department = an org department AND/OR a named coverage group covering one
+  // or more Sales (BRD section 6.2) - grouped by Expense.departmentId,
+  // matching the requested "DEPARTMENT | TRANSACTION | TOTAL" report shape.
+  async expenseByDepartment(actor: AuthUser, filter: PeriodFilter) {
+    const scopedDepartmentIds = await this.resolveDepartmentScope(actor);
     const where = this.buildWhere(filter);
     const grouped = await this.prisma.expense.groupBy({
-      by: ['podId'],
-      where: { ...where, podId: scopedPodIds ? { in: scopedPodIds } : { not: null } },
+      by: ['departmentId'],
+      where: { ...where, departmentId: scopedDepartmentIds ? { in: scopedDepartmentIds } : { not: null } },
       _sum: { amount: true },
       _count: true,
     });
 
-    const podIds = grouped.map((g) => g.podId).filter((id): id is string => !!id);
-    const pods = await this.prisma.pod.findMany({
-      where: { id: { in: podIds } },
-      include: { members: { include: { sales: { select: { name: true } } } } },
+    const departmentIds = grouped.map((g) => g.departmentId).filter((id): id is string => !!id);
+    const departments = await this.prisma.department.findMany({
+      where: { id: { in: departmentIds } },
+      include: { users: { select: { name: true } } },
     });
-    const podMap = new Map(pods.map((p) => [p.id, p]));
+    const departmentMap = new Map(departments.map((d) => [d.id, d]));
 
     return grouped.map((g) => {
-      const pod = podMap.get(g.podId as string);
+      const department = departmentMap.get(g.departmentId as string);
       return {
-        id: g.podId,
-        name: pod?.name ?? '-',
-        sales: pod?.members.map((m) => m.sales.name).join(', ') || '-',
+        id: g.departmentId,
+        name: department?.name ?? '-',
+        sales: department?.users.map((u) => u.name).join(', ') || '-',
         totalExpense: g._sum.amount ?? 0,
         transactionCount: g._count,
       };
@@ -195,8 +200,8 @@ export class DashboardService {
   }
 
   async expenseByMonth(actor: AuthUser, filter: PeriodFilter) {
-    const podIds = await this.resolvePodScope(actor);
-    const where = this.buildWhere(filter, podIds);
+    const departmentIds = await this.resolveDepartmentScope(actor);
+    const where = this.buildWhere(filter, departmentIds);
     const expenses = await this.prisma.expense.findMany({ where, select: { expenseDate: true, amount: true } });
     const byMonth = new Map<string, { total: number; count: number }>();
     for (const e of expenses) {
@@ -217,8 +222,8 @@ export class DashboardService {
     fkField: 'unitId' | 'salesId' | 'advertiserId' | 'brandId',
     label: string,
   ) {
-    const podIds = await this.resolvePodScope(actor);
-    const where = this.buildWhere(filter, podIds);
+    const departmentIds = await this.resolveDepartmentScope(actor);
+    const where = this.buildWhere(filter, departmentIds);
     const grouped = await this.prisma.expense.groupBy({
       by: [fkField],
       where,

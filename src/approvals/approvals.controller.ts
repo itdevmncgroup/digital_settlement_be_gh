@@ -55,11 +55,11 @@ export class ApprovalsController {
   @Get('pending')
   pending(
     @CurrentUser() actor: AuthUser,
-    @Query('podId') podId?: string,
+    @Query('departmentId') departmentId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    return this.service.findPendingFor(actor.userId, actor.permissions, { podId, fromDate, toDate });
+    return this.service.findPendingFor(actor.userId, actor.permissions, { departmentId, fromDate, toDate });
   }
 
   @Get('expense/:expenseId')

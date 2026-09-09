@@ -293,37 +293,28 @@ export class BankMatchingService {
     return isMatched;
   }
 
-  // Being bank-matched is the sole gate into the Expense approval chain (there's
-  // no separate manual Submit step) - newly matched while DRAFT enters the chain;
-  // unmatched while still mid-chain reverts it to DRAFT. REJECTED/SETTLED are left
-  // alone either way (a rejected-and-not-yet-edited or already-settled Expense
-  // shouldn't silently resurrect just because its bank match was toggled).
+  // Matching happens after the Expense chain, not before it: an Expense arrives
+  // here already READY_TO_MATCHING (HEAD_POD -> CO-CSO-1 -> CO-CSO-2 all
+  // approved), and matching is what makes it READY_TO_SETTLED, i.e. eligible to
+  // be grouped into a Settlement. Unmatching walks that single step back. Every
+  // other status is left alone - an Expense still mid-approval, rejected, or
+  // already in a Settlement must not be moved by a match toggle.
   private async afterMatchChange(expenseId: string): Promise<void> {
     const isMatched = await this.recomputeIsMatched(expenseId);
     const expense = await this.prisma.expense.findUniqueOrThrow({ where: { id: expenseId } });
 
-    if (isMatched && expense.status === ExpenseStatus.DRAFT) {
-      await this.prisma.$transaction((tx) =>
-        this.approvals.enterExpenseApproval(tx, {
-          expenseId,
-          amount: expense.amount,
-          podId: expense.podId,
-          departmentId: expense.departmentId,
-        }),
-      );
-    } else if (
-      !isMatched &&
-      expense.status !== ExpenseStatus.DRAFT &&
-      expense.status !== ExpenseStatus.REJECTED &&
-      expense.status !== ExpenseStatus.SETTLED
-    ) {
-      await this.prisma.$transaction((tx) => this.approvals.cancelExpenseApproval(tx, expenseId));
+    if (isMatched && expense.status === ExpenseStatus.READY_TO_MATCHING) {
+      await this.prisma.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_SETTLED } });
+    } else if (!isMatched && expense.status === ExpenseStatus.READY_TO_SETTLED) {
+      await this.prisma.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_MATCHING } });
     }
   }
 
   private async loadCandidates(): Promise<Candidate[]> {
     const expenses = await this.prisma.expense.findMany({
-      where: { isMatched: false },
+      // Only Expenses that have cleared their approval chain are matchable -
+      // matching is the step right after it (READY_TO_MATCHING -> READY_TO_SETTLED).
+      where: { isMatched: false, status: ExpenseStatus.READY_TO_MATCHING },
       select: {
         id: true,
         amount: true,

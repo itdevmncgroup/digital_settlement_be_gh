@@ -24,14 +24,14 @@ export class MyDashboardController {
 }
 
 // Management Dashboard (BRD section 5.5, 37) - Management/Admin/Finance always
-// get in (unchanged), and dashboard.read.all/dashboard.read.ownpod (Role/
+// get in (unchanged), and dashboard.read.all/dashboard.read.owndept (Role/
 // Permission master) now also admit any other role holding one of them (OR'd
-// against @Roles by RolesGuard). Which one determines the POD scope each
-// report is computed under - see DashboardService.resolvePodScope().
+// against @Roles by RolesGuard). Which one determines the Department scope
+// each report is computed under - see DashboardService.resolveDepartmentScope().
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RoleName.MANAGEMENT, RoleName.ADMIN, RoleName.FINANCE)
-@RequirePermission('dashboard.read.all', 'dashboard.read.ownpod')
+@RequirePermission('dashboard.read.all', 'dashboard.read.owndept')
 export class DashboardController {
   constructor(private readonly service: DashboardService) {}
 
@@ -60,9 +60,9 @@ export class DashboardController {
     return this.service.expenseByBrand(actor, filter);
   }
 
-  @Get('expense-by-pod')
-  byPod(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
-    return this.service.expenseByPod(actor, filter);
+  @Get('expense-by-department')
+  byDepartment(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
+    return this.service.expenseByDepartment(actor, filter);
   }
 
   @Get('expense-by-month')
