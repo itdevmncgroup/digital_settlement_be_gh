@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BankTxnStatus, ExpenseStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
@@ -7,6 +7,8 @@ import { StorageService } from '../common/storage/storage.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { normalizeName } from '../common/matching/normalize';
 import { parseBankStatementPdf } from './bank-statement-parser.util';
+import { RoleName } from '../common/constants/role-name';
+import { AuthUser } from '../common/decorators/current-user.decorator';
 
 const AMOUNT_EXACT_SCORE = 60;
 const AMOUNT_CLOSE_SCORE = 30;
@@ -211,17 +213,18 @@ export class BankMatchingService {
     return { ...(await this.findBatch(batchId)), alreadyScanned: true };
   }
 
-  async manualMatch(transactionId: string, expenseId: string, actorId: string) {
+  async manualMatch(transactionId: string, expenseId: string, actor: AuthUser) {
     const txn = await this.getTxnOrThrow(transactionId);
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
     if (!expense) throw new NotFoundException('Expense not found');
+    await this.assertMatchOverride(actor, expenseId);
 
     const updated = await this.prisma.bankTransaction.update({
       where: { id: transactionId },
       data: {
         status: BankTxnStatus.MANUAL_MATCHED,
         matchedExpenseId: expenseId,
-        matchedById: actorId,
+        matchedById: actor.userId,
         matchedAt: new Date(),
       },
       include: txnInclude,
@@ -233,7 +236,7 @@ export class BankMatchingService {
     }
 
     await this.audit.log({
-      userId: actorId,
+      userId: actor.userId,
       action: 'MANUAL_MATCH',
       objectType: 'BankTransaction',
       objectId: transactionId,
@@ -243,8 +246,9 @@ export class BankMatchingService {
     return updated;
   }
 
-  async unmatch(transactionId: string, actorId: string) {
+  async unmatch(transactionId: string, actor: AuthUser) {
     const txn = await this.getTxnOrThrow(transactionId);
+    await this.assertMatchOverride(actor, txn.matchedExpenseId);
 
     const updated = await this.prisma.bankTransaction.update({
       where: { id: transactionId },
@@ -263,7 +267,7 @@ export class BankMatchingService {
     }
 
     await this.audit.log({
-      userId: actorId,
+      userId: actor.userId,
       action: 'UNMATCH',
       objectType: 'BankTransaction',
       objectId: transactionId,
@@ -271,6 +275,105 @@ export class BankMatchingService {
       newValue: { status: updated.status },
     });
     return updated;
+  }
+
+  // "Manual, no billing statement" match - for spend that will never show up on a
+  // bank/credit-card statement line at all (e-wallet, personal cash pending
+  // reimbursement). Sets Expense.isMatched directly instead of linking a
+  // BankTransaction - safe because recomputeIsMatched() only ever re-derives the
+  // flag when a BankTransaction that references this Expense changes, and with
+  // none linked, that never happens, so the flag holds until this endpoint (or
+  // manualUnmatchExpense) changes it again.
+  async manualMatchExpense(expenseId: string, actor: AuthUser) {
+    const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
+    if (!expense) throw new NotFoundException('Expense not found');
+    await this.assertMatchOverride(actor, expenseId);
+
+    const linkedTxn = await this.getLinkedMatchedTxn(expenseId);
+    if (linkedTxn) {
+      throw new ConflictException('This expense is already linked to a bank transaction - unmatch that transaction instead');
+    }
+
+    await this.prisma.expense.update({ where: { id: expenseId }, data: { isMatched: true } });
+    if (expense.status === ExpenseStatus.READY_TO_MATCHING) {
+      await this.prisma.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_SETTLED } });
+    }
+
+    await this.audit.log({
+      userId: actor.userId,
+      action: 'MANUAL_MATCH_NO_TXN',
+      objectType: 'Expense',
+      objectId: expenseId,
+      oldValue: { isMatched: expense.isMatched, status: expense.status },
+      newValue: { isMatched: true },
+    });
+
+    return this.prisma.expense.findUniqueOrThrow({ where: { id: expenseId } });
+  }
+
+  async manualUnmatchExpense(expenseId: string, actor: AuthUser) {
+    const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
+    if (!expense) throw new NotFoundException('Expense not found');
+    await this.assertMatchOverride(actor, expenseId);
+
+    const linkedTxn = await this.getLinkedMatchedTxn(expenseId);
+    if (linkedTxn) {
+      throw new ConflictException('This expense is linked to a bank transaction - unmatch that transaction instead');
+    }
+
+    await this.prisma.expense.update({ where: { id: expenseId }, data: { isMatched: false } });
+    if (expense.status === ExpenseStatus.READY_TO_SETTLED) {
+      await this.prisma.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_MATCHING } });
+    }
+
+    await this.audit.log({
+      userId: actor.userId,
+      action: 'MANUAL_UNMATCH_NO_TXN',
+      objectType: 'Expense',
+      objectId: expenseId,
+      oldValue: { isMatched: expense.isMatched, status: expense.status },
+      newValue: { isMatched: false },
+    });
+
+    return this.prisma.expense.findUniqueOrThrow({ where: { id: expenseId } });
+  }
+
+  private getLinkedMatchedTxn(expenseId: string) {
+    return this.prisma.bankTransaction.findFirst({
+      where: { matchedExpenseId: expenseId, status: { in: [BankTxnStatus.AUTO_MATCHED, BankTxnStatus.MANUAL_MATCHED] } },
+    });
+  }
+
+  // Mirrors approvals.service's assertApprovalOverride: expense.match.all opens
+  // every Expense, expense.match.ownpod only ones in the actor's own
+  // Department(s) (User.departmentId or an active DepartmentPositionAssignment -
+  // "POD" pre-merge_pod_into_department terminology). ADMIN/FINANCE/MANAGEMENT
+  // keep the unrestricted access the controller's class-level @Roles already
+  // implied before these permissions existed. A txn with no matchedExpenseId
+  // (unmatch on an already-unmatched line) has nothing to scope against, so
+  // only the unrestricted grants apply.
+  private async assertMatchOverride(actor: AuthUser, expenseId: string | null): Promise<void> {
+    const unrestrictedRoles: string[] = [RoleName.ADMIN, RoleName.FINANCE, RoleName.MANAGEMENT];
+    if (actor.roles.some((r) => unrestrictedRoles.includes(r))) return;
+    if (actor.permissions?.includes('expense.match.all')) return;
+    if (expenseId && actor.permissions?.includes('expense.match.ownpod')) {
+      const expense = await this.prisma.expense.findUnique({ where: { id: expenseId }, select: { departmentId: true } });
+      if (expense?.departmentId) {
+        const ownDepartmentIds = await this.getActorDepartmentIds(actor.userId);
+        if (ownDepartmentIds.includes(expense.departmentId)) return;
+      }
+    }
+    throw new ForbiddenException('You are not allowed to match/unmatch this expense');
+  }
+
+  private async getActorDepartmentIds(actorId: string): Promise<string[]> {
+    const [user, assignments] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } }),
+      this.prisma.departmentPositionAssignment.findMany({ where: { userId: actorId, status: 'ACTIVE' }, select: { departmentId: true } }),
+    ]);
+    const ids = new Set(assignments.map((a) => a.departmentId));
+    if (user?.departmentId) ids.add(user.departmentId);
+    return Array.from(ids);
   }
 
   private async getTxnOrThrow(id: string) {

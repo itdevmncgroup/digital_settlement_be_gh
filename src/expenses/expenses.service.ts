@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { BankTxnStatus, ExpenseStatus, Prisma } from '@prisma/client';
+import { ExpenseStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
@@ -49,8 +49,6 @@ const include = {
   bankTransactions: { select: { id: true, status: true, batchId: true, batch: { select: { id: true, fileName: true } } } },
   settlement: { select: { id: true, settlementNo: true } },
 } as const;
-
-const MATCHED_TXN_STATUSES: BankTxnStatus[] = [BankTxnStatus.AUTO_MATCHED, BankTxnStatus.MANUAL_MATCHED];
 
 // Editable until approved/rejected/settled - matches web-admin's edit-gate policy.
 const LOCKED_STATUSES: ExpenseStatus[] = [ExpenseStatus.APPROVED, ExpenseStatus.REJECTED, ExpenseStatus.SETTLED];
@@ -138,12 +136,11 @@ export class ExpensesService {
               lte: filter.toDate ? new Date(filter.toDate) : undefined,
             }
           : undefined,
-      bankTransactions:
-        filter.matched === 'MATCHED'
-          ? { some: { status: { in: MATCHED_TXN_STATUSES } } }
-          : filter.matched === 'UNMATCHED'
-          ? { none: { status: { in: MATCHED_TXN_STATUSES } } }
-          : undefined,
+      // isMatched is the source of truth (also true for a manual match with no
+      // billing-statement transaction at all - e.g. e-wallet/personal
+      // reimbursement), so filter on it directly rather than the bankTransactions
+      // relation, which is empty in that case.
+      isMatched: filter.matched === 'MATCHED' ? true : filter.matched === 'UNMATCHED' ? false : undefined,
       ...(filter.search
         ? {
             OR: [
@@ -195,7 +192,7 @@ export class ExpensesService {
         purpose: r.purpose,
         amount: Number(r.amount),
         status: r.status,
-        matching: r.bankTransactions.some((t) => MATCHED_TXN_STATUSES.includes(t.status)) ? 'Matched' : 'Not Matched',
+        matching: r.isMatched ? 'Matched' : 'Not Matched',
         settlement: r.settlement?.settlementNo ?? '',
       });
     }

@@ -81,12 +81,29 @@ export class BankMatchingController {
   }
 
   @Post('transactions/:id/match')
+  @RequirePermission('expense.match.all', 'expense.match.ownpod')
   match(@Param('id') id: string, @Body() dto: ManualMatchDto, @CurrentUser() actor: AuthUser) {
-    return this.service.manualMatch(id, dto.expenseId, actor.userId);
+    return this.service.manualMatch(id, dto.expenseId, actor);
   }
 
   @Post('transactions/:id/unmatch')
+  @RequirePermission('expense.match.all', 'expense.match.ownpod')
   unmatch(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.service.unmatch(id, actor.userId);
+    return this.service.unmatch(id, actor);
+  }
+
+  // "Manual, no billing statement" match/unmatch - backs the Expense detail
+  // page's "Matched (no statement)" option for spend that never appears on a
+  // bank/credit-card statement (e-wallet, personal cash pending reimbursement).
+  @Post('expenses/:expenseId/manual-match')
+  @RequirePermission('expense.match.all', 'expense.match.ownpod')
+  manualMatchExpense(@Param('expenseId') expenseId: string, @CurrentUser() actor: AuthUser) {
+    return this.service.manualMatchExpense(expenseId, actor);
+  }
+
+  @Post('expenses/:expenseId/manual-unmatch')
+  @RequirePermission('expense.match.all', 'expense.match.ownpod')
+  manualUnmatchExpense(@Param('expenseId') expenseId: string, @CurrentUser() actor: AuthUser) {
+    return this.service.manualUnmatchExpense(expenseId, actor);
   }
 }

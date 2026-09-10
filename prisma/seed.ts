@@ -44,6 +44,8 @@ async function main() {
     'expense.approve.all',
     'expense.approve.owndept',
     'expense.automatch',
+    'expense.match.all',
+    'expense.match.ownpod',
     'expense.create.all',
     'expense.create.owndept',
     'approval.read.all',

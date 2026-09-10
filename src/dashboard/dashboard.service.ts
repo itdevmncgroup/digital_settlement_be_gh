@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { canViewAllRecords } from '../common/rbac/scope.util';
+import { RoleName } from '../common/constants/role-name';
 
 export interface PeriodFilter {
   from?: string;
@@ -41,21 +42,45 @@ export class DashboardService {
     // dashboard count must stay "actionable right now", so filter those out.
     const pendingApprovalCount = pending.filter((p) => p.isMyTurn).length;
 
+    // "jumlah expense" dashboard stat: sum of Expense.amount whose Settlement has
+    // reached COMPLETE. SALES/SALES_ADMIN and HEAD_POD only see their own pod(s)
+    // (Department); every other role (ADMIN etc.) sees the company-wide total.
+    const isPodRestricted =
+      positionCode === 'HEAD_POD' ||
+      (actor.roles ?? []).some((r) => r === RoleName.SALES || r === RoleName.SALES_ADMIN);
+
+    let headPodAssignments: { departmentId: string; department: { id: string; name: string } }[] = [];
+    let podDepartmentIds: string[] = [];
     if (positionCode === 'HEAD_POD') {
-      const assignments = await this.prisma.departmentPositionAssignment.findMany({
+      headPodAssignments = await this.prisma.departmentPositionAssignment.findMany({
         where: { userId: actor.userId, position: { code: 'HEAD_POD' }, status: 'ACTIVE' },
         include: { department: true },
       });
-      const departmentIds = assignments.map((a) => a.departmentId);
+      podDepartmentIds = headPodAssignments.map((a) => a.departmentId);
+    } else if (isPodRestricted) {
+      podDepartmentIds = user?.departmentId ? [user.departmentId] : [];
+    }
+
+    const expenseAmountAgg = await this.prisma.expense.aggregate({
+      where: {
+        departmentId: isPodRestricted ? { in: podDepartmentIds } : undefined,
+        settlement: { status: SettlementStatus.COMPLETE },
+      },
+      _sum: { amount: true },
+    });
+    const totalExpenseAmount = expenseAmountAgg._sum.amount ?? 0;
+
+    if (positionCode === 'HEAD_POD') {
       const agg = await this.prisma.expense.aggregate({
-        where: { departmentId: { in: departmentIds }, status: ExpenseStatus.SETTLED },
+        where: { departmentId: { in: podDepartmentIds }, status: ExpenseStatus.SETTLED },
         _sum: { amount: true },
       });
       return {
         positionCode,
         pendingApprovalCount,
-        departments: assignments.map((a) => ({ id: a.department.id, name: a.department.name })),
+        departments: headPodAssignments.map((a) => ({ id: a.department.id, name: a.department.name })),
         totalSettledAmount: agg._sum.amount ?? 0,
+        totalExpenseAmount,
       };
     }
 
@@ -69,6 +94,7 @@ export class DashboardService {
         pendingApprovalCount,
         department: user?.department ? { id: user.department.id, name: user.department.name } : null,
         totalSettledAmount: agg._sum.amount ?? 0,
+        totalExpenseAmount,
       };
     }
 
@@ -83,10 +109,11 @@ export class DashboardService {
         totalSettledAmount: expenseAgg._sum.amount ?? 0,
         approvedExpenseCount: expenseAgg._count,
         approvedSettlementCount,
+        totalExpenseAmount,
       };
     }
 
-    return { positionCode, pendingApprovalCount };
+    return { positionCode, pendingApprovalCount, totalExpenseAmount };
   }
 
   // dashboard.read.all / dashboard.read.owndept (Role/Permission master) scope

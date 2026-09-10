@@ -37,8 +37,11 @@ const include = {
       sales: { select: { id: true, name: true } },
       advertiser: { select: { name: true } },
       brand: { select: { name: true } },
-      // Backs the Settlement detail's per-transaction Approve/Reject (re-affirm
-      // the match / unmatch) - reuses BankMatchingService's existing endpoints.
+      // isMatched is the source of truth for the Matched/Not Matched badge on the
+      // Settlement detail's expense list - also true for a manual match with no
+      // billing-statement transaction at all (e-wallet/personal reimbursement),
+      // which bankTransactions alone wouldn't show.
+      isMatched: true,
       bankTransactions: { select: { id: true, status: true } },
       // The Expense's own chain (HEAD_POD -> CO-CSO-1 -> CO-CSO-2), already
       // finished by the time it can join a batch - shown for history. The tier
