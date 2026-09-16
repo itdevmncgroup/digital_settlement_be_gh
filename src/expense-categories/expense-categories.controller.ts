@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { ExpenseCategoriesService } from './expense-categories.service';
 import { CreateExpenseCategoryDto, UpdateExpenseCategoryDto } from './dto/expense-category.dto';
@@ -13,8 +13,8 @@ export class ExpenseCategoriesController {
   constructor(private readonly service: ExpenseCategoriesService) {}
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query('active') active?: string) {
+    return this.service.findAll(active === 'true');
   }
 
   @Get(':id')

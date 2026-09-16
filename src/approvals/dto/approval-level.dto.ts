@@ -18,9 +18,21 @@ export class CreateApprovalLevelDto {
   @IsEnum(ApprovalScopeType)
   scopeType?: ApprovalScopeType;
 
+  // Departments this Level applies to when scopeType is DEPARTMENT - can list
+  // several (e.g. one CO-CSO-1 chain covering POD 1/4/5/6 at once).
   @IsOptional()
-  @IsString()
-  departmentId?: string;
+  @IsArray()
+  @IsString({ each: true })
+  departmentIds?: string[];
+
+  // Position(s) the requestor (Expense/Event sales) must hold for this Level to
+  // match - e.g. a Sales requestor's Expense matches a HEAD_POD-first chain,
+  // while a HEAD_POD requestor's own Expense matches a CO-CSO-first chain.
+  // Empty/omitted matches any requestor.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  requestorPositionIds?: string[];
 
   @IsNumber()
   @Min(0)
@@ -49,8 +61,14 @@ export class UpdateApprovalLevelDto {
   scopeType?: ApprovalScopeType;
 
   @IsOptional()
-  @IsString()
-  departmentId?: string;
+  @IsArray()
+  @IsString({ each: true })
+  departmentIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  requestorPositionIds?: string[];
 
   @IsOptional()
   @IsNumber()

@@ -18,25 +18,29 @@ const departmentInclude = {
 // section 6.2, formerly the separate "Pod" concept). Coverage (which Agency
 // <-> Brand pairs it covers) is DepartmentAssignment - a Brand may appear at
 // most once per Department, but one Agency can cover many Brands. Membership
-// (which Sales belongs to a Department) is simply User.departmentId, not a
-// join table here.
+// (which Sales belongs to which Department(s), many-to-many) is UserDepartment.
 @Injectable()
 export class DepartmentsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  // filter.salesId: that Sales' own Department (0 or 1, via User.departmentId),
-  // returned as an array for parity with other list endpoints.
-  async findAll(filter: { salesId?: string; search?: string } = {}) {
+  // filter.salesId: that Sales' own Department(s) (via UserDepartment).
+  async findAll(filter: { salesId?: string; search?: string; activeOnly?: boolean } = {}) {
     if (filter.salesId) {
       const user = await this.prisma.user.findUnique({
         where: { id: filter.salesId },
-        select: { department: { include: departmentInclude } },
+        select: {
+          departments: {
+            where: { status: 'ACTIVE', department: filter.activeOnly ? { isActive: true } : undefined },
+            select: { department: { include: departmentInclude } },
+          },
+        },
       });
-      return user?.department ? [user.department] : [];
+      return user?.departments.map((d) => d.department) ?? [];
     }
     return this.prisma.department.findMany({
       where: {
         name: filter.search ? { contains: filter.search, mode: 'insensitive' } : undefined,
+        isActive: filter.activeOnly ? true : undefined,
       },
       include: departmentInclude,
       orderBy: { name: 'asc' },
@@ -44,24 +48,27 @@ export class DepartmentsService {
   }
 
   // GET /departments/me - every Department the caller may act as belonging to:
-  // their own membership (User.departmentId) plus any Department they hold an
+  // their own membership(s) (UserDepartment) plus any Department they hold an
   // active approval Position for (DepartmentPositionAssignment - e.g. HEAD_POD,
-  // whose "own" Department is never User.departmentId). Broader than
-  // findAll({salesId}) above, which only reads User.departmentId and is meant
-  // for looking up an arbitrary OTHER Sales' single Department, not the
-  // caller's own scope - this is what feeds the New Expense Department picker
-  // for an expense.create.owndept caller (see ExpensesService.
+  // whose "own" Department is never a membership row). Broader than
+  // findAll({salesId}) above, which only reads UserDepartment and is meant for
+  // looking up an arbitrary OTHER Sales' Department(s), not the caller's own
+  // scope - this is what feeds the New Expense Department picker for an
+  // expense.create.owndept caller (see ExpensesService.
   // assertCanCreateForDepartment/getManagedDepartmentIds, same two sources).
   async findMine(actorId: string) {
     const [user, assignments] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: actorId }, select: { department: { include: departmentInclude } } }),
+      this.prisma.user.findUnique({
+        where: { id: actorId },
+        select: { departments: { where: { status: 'ACTIVE', department: { isActive: true } }, select: { department: { include: departmentInclude } } } },
+      }),
       this.prisma.departmentPositionAssignment.findMany({
-        where: { userId: actorId, status: 'ACTIVE' },
+        where: { userId: actorId, status: 'ACTIVE', department: { isActive: true } },
         select: { department: { include: departmentInclude } },
       }),
     ]);
-    const byId = new Map<string, NonNullable<typeof user>['department']>();
-    if (user?.department) byId.set(user.department.id, user.department);
+    const byId = new Map<string, NonNullable<typeof user>['departments'][number]['department']>();
+    for (const d of user?.departments ?? []) byId.set(d.department.id, d.department);
     for (const a of assignments) byId.set(a.department.id, a.department);
     return Array.from(byId.values());
   }

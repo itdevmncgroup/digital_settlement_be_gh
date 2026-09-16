@@ -14,8 +14,8 @@ export class AgenciesController {
   constructor(private readonly service: AgenciesService) {}
 
   @Get()
-  findAll(@Query('search') search?: string) {
-    return this.service.findAll(search);
+  findAll(@Query('search') search?: string, @Query('active') active?: string) {
+    return this.service.findAll(search, active === 'true');
   }
 
   @Get(':id')

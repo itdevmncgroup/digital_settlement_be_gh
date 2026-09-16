@@ -85,10 +85,10 @@ export class SettlementsService {
   async findAll(actor: AuthUser, departmentId?: string) {
     let departmentIds: string[] | undefined;
     if (!canViewAllRecords(actor) && !actor.permissions?.includes('settlement.read.all')) {
-      const user = await this.prisma.user.findUnique({ where: { id: actor.userId }, select: { departmentId: true } });
       // No Department on the actor's own profile means their position sits above
       // Department level (e.g. Co-Chief Sales Officer) - they see every Department.
-      if (user?.departmentId) departmentIds = [user.departmentId];
+      const memberships = await this.getUserDepartmentIds(actor.userId);
+      if (memberships.length > 0) departmentIds = memberships;
     }
     return this.prisma.settlement.findMany({
       where: { departmentId: departmentId ?? (departmentIds ? { in: departmentIds } : undefined) },
@@ -108,13 +108,13 @@ export class SettlementsService {
   async create(actorId: string, actorRoles: string[], dtoSalesId?: string) {
     const targetSalesId = this.isBackOffice(actorRoles) && dtoSalesId ? dtoSalesId : actorId;
 
-    const targetUser = await this.prisma.user.findUnique({ where: { id: targetSalesId }, select: { departmentId: true } });
-    if (!targetUser?.departmentId) return [];
+    const departmentIds = await this.getUserDepartmentIds(targetSalesId);
+    if (departmentIds.length === 0) return [];
 
     const eligible = await this.prisma.expense.findMany({
       where: {
         salesId: targetSalesId,
-        departmentId: targetUser.departmentId,
+        departmentId: { in: departmentIds },
         settlementId: null,
         status: ExpenseStatus.READY_TO_SETTLED,
         isMatched: true,
@@ -166,8 +166,7 @@ export class SettlementsService {
   // target a Department they belong to; ADMIN/FINANCE may target any Department.
   async generate(departmentId: string, fromDate: string, toDate: string, actorId: string, actorRoles: string[]) {
     if (!this.isBackOffice(actorRoles)) {
-      const user = await this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } });
-      if (user?.departmentId !== departmentId) throw new ForbiddenException('You are not a member of this Department');
+      await this.assertMemberOfDepartment(actorId, departmentId);
     }
 
     const from = new Date(fromDate);
@@ -211,8 +210,7 @@ export class SettlementsService {
   // still rejected server-side.
   async createFromSelection(departmentId: string, expenseIds: string[], actorId: string, actorRoles: string[]) {
     if (!this.isBackOffice(actorRoles)) {
-      const user = await this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } });
-      if (user?.departmentId !== departmentId) throw new ForbiddenException('You are not a member of this Department');
+      await this.assertMemberOfDepartment(actorId, departmentId);
     }
 
     const expenses = await this.prisma.expense.findMany({
@@ -270,12 +268,15 @@ export class SettlementsService {
   // Department's Expenses become matched.
   async addExpenses(id: string, expenseIds: string[], actorId: string, actorRoles: string[]) {
     const settlement = await this.findOne(id);
-    if (settlement.status !== SettlementStatus.DRAFT) {
-      throw new BadRequestException('Only a DRAFT settlement can have expenses added to it');
+    // Status leaves DRAFT for the first tier (APPROVAL_SLS_MAR_DIR) the moment
+    // the settlement is created (see enterSettlementStage) - joining is only
+    // safe while still on that first tier, since new Expenses would otherwise
+    // slip past a tier that has already approved without them.
+    if (settlement.status !== SettlementStatus.DRAFT && settlement.status !== SettlementStatus.APPROVAL_SLS_MAR_DIR) {
+      throw new BadRequestException('Expenses can no longer be added - this settlement has passed its first approval tier');
     }
     if (!this.isBackOffice(actorRoles)) {
-      const user = await this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } });
-      if (user?.departmentId !== settlement.departmentId) throw new ForbiddenException('You are not a member of this Department');
+      await this.assertMemberOfDepartment(actorId, settlement.departmentId);
     }
 
     const expenses = await this.prisma.expense.findMany({
@@ -346,6 +347,16 @@ export class SettlementsService {
 
   private isBackOffice(actorRoles: string[]): boolean {
     return actorRoles.some((r) => r === 'ADMIN' || r === 'FINANCE');
+  }
+
+  private async getUserDepartmentIds(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.userDepartment.findMany({ where: { userId, status: 'ACTIVE' }, select: { departmentId: true } });
+    return memberships.map((m) => m.departmentId);
+  }
+
+  private async assertMemberOfDepartment(userId: string, departmentId: string): Promise<void> {
+    const departmentIds = await this.getUserDepartmentIds(userId);
+    if (!departmentIds.includes(departmentId)) throw new ForbiddenException('You are not a member of this Department');
   }
 
   private async generateSettlementNo(): Promise<string> {

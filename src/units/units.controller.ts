@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { UnitsService } from './units.service';
 import { CreateUnitDto, UpdateUnitDto } from './dto/unit.dto';
@@ -13,8 +13,8 @@ export class UnitsController {
   constructor(private readonly unitsService: UnitsService) {}
 
   @Get()
-  findAll() {
-    return this.unitsService.findAll();
+  findAll(@Query('active') active?: string) {
+    return this.unitsService.findAll(active === 'true');
   }
 
   @Get(':id')

@@ -7,8 +7,8 @@ import { CreateUnitDto, UpdateUnitDto } from './dto/unit.dto';
 export class UnitsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll() {
-    return this.prisma.unit.findMany({ orderBy: { name: 'asc' } });
+  findAll(activeOnly?: boolean) {
+    return this.prisma.unit.findMany({ where: activeOnly ? { isActive: true } : undefined, orderBy: { name: 'asc' } });
   }
 
   async findOne(id: string) {

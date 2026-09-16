@@ -9,8 +9,12 @@ const include = { department: { select: { id: true, name: true } } } as const;
 export class CreditCardsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll(departmentId?: string) {
-    return this.prisma.creditCard.findMany({ where: { departmentId }, include, orderBy: { bank: 'asc' } });
+  findAll(departmentId?: string, activeOnly?: boolean) {
+    return this.prisma.creditCard.findMany({
+      where: { departmentId, isActive: activeOnly ? true : undefined },
+      include,
+      orderBy: { bank: 'asc' },
+    });
   }
 
   async findOne(id: string) {

@@ -19,8 +19,9 @@ export class CreateUserDto {
   positionId?: string;
 
   @IsOptional()
-  @IsString()
-  departmentId?: string;
+  @IsArray()
+  @IsString({ each: true })
+  departmentIds?: string[];
 
   @IsOptional()
   @IsString()

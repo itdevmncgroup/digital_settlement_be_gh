@@ -1,4 +1,4 @@
-import { recognize } from 'tesseract.js';
+import { createWorker, recognize } from 'tesseract.js';
 import sharp from 'sharp';
 
 export interface OcrTextResult {
@@ -35,4 +35,22 @@ export async function recognizeText(buffer: Buffer): Promise<OcrTextResult> {
   const preprocessed = await preprocess(buffer);
   const { data } = await recognize(preprocessed, 'eng+ind');
   return { text: data.text, confidence: data.confidence };
+}
+
+// Multi-page variant (bank-statement OCR fallback). The top-level `recognize`
+// above spawns and terminates a worker per call; running every page of a
+// statement through one worker keeps that spin-up out of the per-page loop.
+export async function recognizePages(buffers: Buffer[]): Promise<OcrTextResult[]> {
+  const worker = await createWorker('eng+ind');
+  try {
+    const results: OcrTextResult[] = [];
+    for (const buffer of buffers) {
+      const preprocessed = await preprocess(buffer);
+      const { data } = await worker.recognize(preprocessed);
+      results.push({ text: data.text, confidence: data.confidence });
+    }
+    return results;
+  } finally {
+    await worker.terminate();
+  }
 }

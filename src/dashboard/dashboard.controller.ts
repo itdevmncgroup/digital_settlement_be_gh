@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
-import { DashboardService, PeriodFilter } from './dashboard.service';
+import { DashboardService, PeriodFilter, SettlementPeriodFilter } from './dashboard.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -55,6 +55,16 @@ export class DashboardController {
     return this.service.expenseByAdvertiser(actor, filter);
   }
 
+  @Get('expense-by-agency')
+  byAgency(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
+    return this.service.expenseByAgency(actor, filter);
+  }
+
+  @Get('expense-by-category')
+  byCategory(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
+    return this.service.expenseByCategory(actor, filter);
+  }
+
   @Get('expense-by-brand')
   byBrand(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
     return this.service.expenseByBrand(actor, filter);
@@ -68,5 +78,70 @@ export class DashboardController {
   @Get('expense-by-month')
   byMonth(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
     return this.service.expenseByMonth(actor, filter);
+  }
+
+  @Get('recent-transactions')
+  recentTransactions(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter, @Query('limit') limit?: string) {
+    return this.service.recentTransactions(actor, filter, limit ? Number(limit) : undefined);
+  }
+
+  @Get('settlement-summary')
+  settlementSummary(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter) {
+    return this.service.settlementSummary(actor, filter);
+  }
+
+  @Get('settlement-status')
+  settlementStatus(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter) {
+    return this.service.settlementStatusBreakdown(actor, filter);
+  }
+
+  @Get('settlement-trend')
+  settlementTrend(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter) {
+    return this.service.settlementTrend(actor, filter);
+  }
+
+  @Get('settlement-by-pod')
+  settlementByPod(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter) {
+    return this.service.settlementByPod(actor, filter);
+  }
+
+  @Get('settlement-top-submitters')
+  settlementTopSubmitters(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter, @Query('limit') limit?: string) {
+    return this.service.settlementTopSubmitters(actor, filter, limit ? Number(limit) : undefined);
+  }
+
+  @Get('settlement-approval-progress')
+  settlementApprovalProgress(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter) {
+    return this.service.settlementApprovalProgress(actor, filter);
+  }
+
+  @Get('settlement-processing-time-by-pod')
+  settlementProcessingTimeByPod(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter) {
+    return this.service.settlementProcessingTimeByPod(actor, filter);
+  }
+
+  @Get('settlement-transactions')
+  recentSettlements(@CurrentUser() actor: AuthUser, @Query() filter: SettlementPeriodFilter, @Query('limit') limit?: string) {
+    return this.service.recentSettlements(actor, filter, limit ? Number(limit) : undefined);
+  }
+
+  @Get('expense-settlement-summary')
+  expenseSettlementSummary(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
+    return this.service.expenseSettlementSummary(actor, filter);
+  }
+
+  @Get('expense-vs-settlement-by-pod')
+  expenseVsSettlementByPod(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
+    return this.service.expenseVsSettlementByPod(actor, filter);
+  }
+
+  @Get('expense-settlement-trend')
+  expenseSettlementTrend(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter) {
+    return this.service.expenseSettlementTrend(actor, filter);
+  }
+
+  @Get('expense-settlement-reconciliation')
+  expenseSettlementReconciliation(@CurrentUser() actor: AuthUser, @Query() filter: PeriodFilter, @Query('limit') limit?: string) {
+    return this.service.expenseSettlementReconciliation(actor, filter, limit ? Number(limit) : undefined);
   }
 }

@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { ArrayNotEmpty, IsArray, IsDateString, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
-import { ParticipantCategory, PaymentMethodType } from '@prisma/client';
+import { ParticipantCategory } from '@prisma/client';
 
 export class ExpenseItemDto {
   @IsString()
@@ -83,8 +83,8 @@ export class CreateExpenseDto {
   costCenterId?: string;
 
   @IsOptional()
-  @IsEnum(PaymentMethodType)
-  paymentMethodType?: PaymentMethodType;
+  @IsString()
+  paymentMethodId?: string;
 
   @IsOptional()
   @IsString()
@@ -150,8 +150,8 @@ export class UpdateExpenseDto {
   costCenterId?: string;
 
   @IsOptional()
-  @IsEnum(PaymentMethodType)
-  paymentMethodType?: PaymentMethodType;
+  @IsString()
+  paymentMethodId?: string;
 
   @IsOptional()
   @IsString()

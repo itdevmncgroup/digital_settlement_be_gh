@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { ActivityTypesService } from './activity-types.service';
 import { CreateActivityTypeDto, UpdateActivityTypeDto } from './dto/activity-type.dto';
@@ -13,8 +13,8 @@ export class ActivityTypesController {
   constructor(private readonly service: ActivityTypesService) {}
 
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query('active') active?: string) {
+    return this.service.findAll(active === 'true');
   }
 
   @Get(':id')

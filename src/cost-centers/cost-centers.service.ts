@@ -7,8 +7,8 @@ import { CreateCostCenterDto, UpdateCostCenterDto } from './dto/cost-center.dto'
 export class CostCentersService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll() {
-    return this.prisma.costCenter.findMany({ orderBy: { name: 'asc' } });
+  findAll(activeOnly?: boolean) {
+    return this.prisma.costCenter.findMany({ where: activeOnly ? { isActive: true } : undefined, orderBy: { name: 'asc' } });
   }
 
   async findOne(id: string) {

@@ -13,11 +13,12 @@ export class BrandsService {
   // advertiserIds narrows to Brands owned by any of those Advertisers (used by the
   // Department picker's Agency -> Advertiser -> Brand cascade). Results are capped since
   // Brand can run into the thousands - search/advertiserIds narrows it down.
-  findAll(filter: { search?: string; advertiserIds?: string[] } = {}) {
+  findAll(filter: { search?: string; advertiserIds?: string[]; activeOnly?: boolean } = {}) {
     return this.prisma.brand.findMany({
       where: {
         ...codeNameWhere(filter.search),
         advertiserId: filter.advertiserIds?.length ? { in: filter.advertiserIds } : undefined,
+        isActive: filter.activeOnly ? true : undefined,
       },
       include: { advertiser: { include: { agency: true } } },
       orderBy: { name: 'asc' },

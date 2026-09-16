@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { BankTxnStatus, ExpenseStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BankTxnStatus, ExpenseStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
@@ -9,6 +9,7 @@ import { normalizeName } from '../common/matching/normalize';
 import { parseBankStatementPdf } from './bank-statement-parser.util';
 import { RoleName } from '../common/constants/role-name';
 import { AuthUser } from '../common/decorators/current-user.decorator';
+import { getActorDepartmentIds } from '../common/rbac/scope.util';
 
 const AMOUNT_EXACT_SCORE = 60;
 const AMOUNT_CLOSE_SCORE = 30;
@@ -51,6 +52,8 @@ interface Candidate {
 
 @Injectable()
 export class BankMatchingService {
+  private readonly logger = new Logger(BankMatchingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -100,65 +103,105 @@ export class BankMatchingService {
     const contentHash = createHash('sha256').update(file.buffer).digest('hex');
     const existing = await this.prisma.bankSettlementBatch.findUnique({ where: { contentHash } });
 
+    // Even on a "no reparsing needed" hit, Expense data may have changed since
+    // this file was last scanned (new matches, edits, deletions) - re-score
+    // the existing lines against current candidates instead of returning a
+    // possibly-stale matching_status.
     if (existing && !force) {
-      return { ...(await this.findBatch(existing.id)), alreadyScanned: true };
+      return this.rematch(existing.id, actorId);
     }
 
     const stored = await this.storage.save(file.buffer, 'bank-settlements', file.originalname);
-    const lines = await parseBankStatementPdf(file.buffer);
 
-    const batch = existing
-      ? await this.prisma.bankSettlementBatch.update({
-          where: { id: existing.id },
-          data: { fileName: file.originalname, storageKey: stored.storageKey, uploadedById: actorId },
-        })
-      : await this.prisma.bankSettlementBatch.create({
-          data: { fileName: file.originalname, storageKey: stored.storageKey, uploadedById: actorId, contentHash },
-        });
-
-    if (existing) {
-      await this.prisma.bankTransaction.deleteMany({ where: { batchId: batch.id } });
+    let lines: Awaited<ReturnType<typeof parseBankStatementPdf>>;
+    try {
+      lines = await parseBankStatementPdf(file.buffer);
+    } catch (err) {
+      this.logger.error(
+        `Failed to parse bank statement "${file.originalname}" (actor ${actorId}): ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw new BadRequestException(
+        'Could not read this statement PDF - it may be corrupted, password-protected, or in an unrecognized format.',
+      );
     }
 
     const candidates = await this.loadCandidates();
+    const counts = { autoMatched: 0, reviewRequired: 0, unmatched: 0 };
 
-    for (const line of lines) {
-      const { expenseId, score } = this.bestMatch(line, candidates);
-      const status =
-        expenseId && score >= AUTO_MATCH_THRESHOLD
-          ? BankTxnStatus.AUTO_MATCHED
-          : expenseId && score >= REVIEW_THRESHOLD
-          ? BankTxnStatus.REVIEW_REQUIRED
-          : BankTxnStatus.UNMATCHED;
+    let batch;
+    try {
+      batch = await this.prisma.$transaction(async (tx) => {
+        const b = existing
+          ? await tx.bankSettlementBatch.update({
+              where: { id: existing.id },
+              data: { fileName: file.originalname, storageKey: stored.storageKey, uploadedById: actorId },
+            })
+          : await tx.bankSettlementBatch.create({
+              data: { fileName: file.originalname, storageKey: stored.storageKey, uploadedById: actorId, contentHash },
+            });
 
-      await this.prisma.bankTransaction.create({
-        data: {
-          batchId: batch.id,
-          lineNo: line.lineNo,
-          transactionDate: line.transactionDate,
-          rawDescription: line.rawDescription,
-          amount: line.amount,
-          cardLast4: line.cardLast4,
-          status,
-          matchedExpenseId: status === BankTxnStatus.UNMATCHED ? undefined : expenseId,
-          matchScore: status === BankTxnStatus.UNMATCHED ? undefined : score,
-        },
+        if (existing) {
+          await tx.bankTransaction.deleteMany({ where: { batchId: b.id } });
+        }
+
+        for (const line of lines) {
+          const { expenseId, score, status } = this.bestMatch(line, candidates);
+          if (status === BankTxnStatus.AUTO_MATCHED) counts.autoMatched++;
+          else if (status === BankTxnStatus.REVIEW_REQUIRED) counts.reviewRequired++;
+          else counts.unmatched++;
+
+          await tx.bankTransaction.create({
+            data: {
+              batchId: b.id,
+              lineNo: line.lineNo,
+              transactionDate: line.transactionDate,
+              rawDescription: line.rawDescription,
+              amount: line.amount,
+              cardLast4: line.cardLast4,
+              status,
+              matchedExpenseId: status === BankTxnStatus.UNMATCHED ? undefined : expenseId,
+              matchScore: status === BankTxnStatus.UNMATCHED ? undefined : score,
+            },
+          });
+
+          if (status === BankTxnStatus.AUTO_MATCHED && expenseId) {
+            await this.afterMatchChange(tx, expenseId);
+          }
+        }
+
+        return b;
       });
-
-      if (status === BankTxnStatus.AUTO_MATCHED && expenseId) {
-        await this.afterMatchChange(expenseId);
-      }
+    } catch (err) {
+      this.logger.error(
+        `Auto-match transaction failed for "${file.originalname}" (actor ${actorId}, ${lines.length} parsed lines): ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw err;
     }
 
-    await this.audit.log({
-      userId: actorId,
-      action: existing ? 'RESCAN' : 'UPLOAD',
-      objectType: 'BankSettlementBatch',
-      objectId: batch.id,
-      newValue: { fileName: file.originalname, lineCount: lines.length },
-    });
+    this.logger.log(
+      `Matched batch ${batch.id} ("${file.originalname}"): ${lines.length} lines parsed - ` +
+        `${counts.autoMatched} auto-matched, ${counts.reviewRequired} need review, ${counts.unmatched} unmatched.`,
+    );
 
-    return { ...(await this.findBatch(batch.id)), alreadyScanned: false };
+    try {
+      await this.audit.log({
+        userId: actorId,
+        action: existing ? 'RESCAN' : 'UPLOAD',
+        objectType: 'BankSettlementBatch',
+        objectId: batch.id,
+        newValue: { fileName: file.originalname, lineCount: lines.length, ...counts },
+      });
+
+      return { ...(await this.findBatch(batch.id)), alreadyScanned: false };
+    } catch (err) {
+      this.logger.error(
+        `Post-match step failed for batch ${batch.id} ("${file.originalname}", actor ${actorId}): ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw err;
+    }
   }
 
   // "TIDAK" branch of the already-scanned prompt: re-run auto-matching against
@@ -169,45 +212,57 @@ export class BankMatchingService {
   async rematch(batchId: string, actorId: string) {
     const batch = await this.findBatch(batchId);
     const candidates = await this.loadCandidates();
+    const counts = { autoMatched: 0, reviewRequired: 0, unmatched: 0 };
 
-    for (const txn of batch.transactions) {
-      if (txn.status === BankTxnStatus.MANUAL_MATCHED) continue;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        for (const txn of batch.transactions) {
+          if (txn.status === BankTxnStatus.MANUAL_MATCHED) continue;
 
-      const previousExpenseId = txn.matchedExpense?.id ?? null;
-      const { expenseId, score } = this.bestMatch(
-        { amount: Number(txn.amount), transactionDate: txn.transactionDate, rawDescription: txn.rawDescription },
-        candidates,
-      );
-      const status =
-        expenseId && score >= AUTO_MATCH_THRESHOLD
-          ? BankTxnStatus.AUTO_MATCHED
-          : expenseId && score >= REVIEW_THRESHOLD
-          ? BankTxnStatus.REVIEW_REQUIRED
-          : BankTxnStatus.UNMATCHED;
+          const previousExpenseId = txn.matchedExpense?.id ?? null;
+          const { expenseId, score, status } = this.bestMatch(
+            { amount: Number(txn.amount), transactionDate: txn.transactionDate, rawDescription: txn.rawDescription },
+            candidates,
+          );
+          if (status === BankTxnStatus.AUTO_MATCHED) counts.autoMatched++;
+          else if (status === BankTxnStatus.REVIEW_REQUIRED) counts.reviewRequired++;
+          else counts.unmatched++;
 
-      await this.prisma.bankTransaction.update({
-        where: { id: txn.id },
-        data: {
-          status,
-          matchedExpenseId: status === BankTxnStatus.UNMATCHED ? null : expenseId,
-          matchScore: status === BankTxnStatus.UNMATCHED ? null : score,
-        },
+          await tx.bankTransaction.update({
+            where: { id: txn.id },
+            data: {
+              status,
+              matchedExpenseId: status === BankTxnStatus.UNMATCHED ? null : expenseId,
+              matchScore: status === BankTxnStatus.UNMATCHED ? null : score,
+            },
+          });
+
+          if (status === BankTxnStatus.AUTO_MATCHED && expenseId) {
+            await this.afterMatchChange(tx, expenseId);
+          }
+          if (previousExpenseId && previousExpenseId !== expenseId) {
+            await this.afterMatchChange(tx, previousExpenseId);
+          }
+        }
       });
-
-      if (status === BankTxnStatus.AUTO_MATCHED && expenseId) {
-        await this.afterMatchChange(expenseId);
-      }
-      if (previousExpenseId && previousExpenseId !== expenseId) {
-        await this.afterMatchChange(previousExpenseId);
-      }
+    } catch (err) {
+      this.logger.error(
+        `Rematch transaction failed for batch ${batchId} (actor ${actorId}): ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw err;
     }
+
+    this.logger.log(
+      `Rematched batch ${batchId}: ${counts.autoMatched} auto-matched, ${counts.reviewRequired} need review, ${counts.unmatched} unmatched.`,
+    );
 
     await this.audit.log({
       userId: actorId,
       action: 'REMATCH',
       objectType: 'BankSettlementBatch',
       objectId: batchId,
-      newValue: { fileName: batch.fileName },
+      newValue: { fileName: batch.fileName, ...counts },
     });
 
     return { ...(await this.findBatch(batchId)), alreadyScanned: true };
@@ -230,9 +285,9 @@ export class BankMatchingService {
       include: txnInclude,
     });
 
-    await this.afterMatchChange(expenseId);
+    await this.afterMatchChange(this.prisma, expenseId);
     if (txn.matchedExpenseId && txn.matchedExpenseId !== expenseId) {
-      await this.afterMatchChange(txn.matchedExpenseId);
+      await this.afterMatchChange(this.prisma, txn.matchedExpenseId);
     }
 
     await this.audit.log({
@@ -263,7 +318,7 @@ export class BankMatchingService {
     });
 
     if (txn.matchedExpenseId) {
-      await this.afterMatchChange(txn.matchedExpenseId);
+      await this.afterMatchChange(this.prisma, txn.matchedExpenseId);
     }
 
     await this.audit.log({
@@ -346,7 +401,7 @@ export class BankMatchingService {
 
   // Mirrors approvals.service's assertApprovalOverride: expense.match.all opens
   // every Expense, expense.match.ownpod only ones in the actor's own
-  // Department(s) (User.departmentId or an active DepartmentPositionAssignment -
+  // Department(s) (UserDepartment or an active DepartmentPositionAssignment -
   // "POD" pre-merge_pod_into_department terminology). ADMIN/FINANCE/MANAGEMENT
   // keep the unrestricted access the controller's class-level @Roles already
   // implied before these permissions existed. A txn with no matchedExpenseId
@@ -359,21 +414,11 @@ export class BankMatchingService {
     if (expenseId && actor.permissions?.includes('expense.match.ownpod')) {
       const expense = await this.prisma.expense.findUnique({ where: { id: expenseId }, select: { departmentId: true } });
       if (expense?.departmentId) {
-        const ownDepartmentIds = await this.getActorDepartmentIds(actor.userId);
+        const ownDepartmentIds = await getActorDepartmentIds(this.prisma, actor.userId);
         if (ownDepartmentIds.includes(expense.departmentId)) return;
       }
     }
     throw new ForbiddenException('You are not allowed to match/unmatch this expense');
-  }
-
-  private async getActorDepartmentIds(actorId: string): Promise<string[]> {
-    const [user, assignments] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } }),
-      this.prisma.departmentPositionAssignment.findMany({ where: { userId: actorId, status: 'ACTIVE' }, select: { departmentId: true } }),
-    ]);
-    const ids = new Set(assignments.map((a) => a.departmentId));
-    if (user?.departmentId) ids.add(user.departmentId);
-    return Array.from(ids);
   }
 
   private async getTxnOrThrow(id: string) {
@@ -387,12 +432,12 @@ export class BankMatchingService {
   // several transactions linked to the same Expense doesn't clear a flag that
   // another still-matched transaction should keep true. Returns the resulting
   // isMatched value so callers can react to it flipping.
-  private async recomputeIsMatched(expenseId: string): Promise<boolean> {
-    const stillMatched = await this.prisma.bankTransaction.count({
+  private async recomputeIsMatched(client: PrismaService | Prisma.TransactionClient, expenseId: string): Promise<boolean> {
+    const stillMatched = await client.bankTransaction.count({
       where: { matchedExpenseId: expenseId, status: { in: [BankTxnStatus.AUTO_MATCHED, BankTxnStatus.MANUAL_MATCHED] } },
     });
     const isMatched = stillMatched > 0;
-    await this.prisma.expense.update({ where: { id: expenseId }, data: { isMatched } });
+    await client.expense.update({ where: { id: expenseId }, data: { isMatched } });
     return isMatched;
   }
 
@@ -402,14 +447,14 @@ export class BankMatchingService {
   // be grouped into a Settlement. Unmatching walks that single step back. Every
   // other status is left alone - an Expense still mid-approval, rejected, or
   // already in a Settlement must not be moved by a match toggle.
-  private async afterMatchChange(expenseId: string): Promise<void> {
-    const isMatched = await this.recomputeIsMatched(expenseId);
-    const expense = await this.prisma.expense.findUniqueOrThrow({ where: { id: expenseId } });
+  private async afterMatchChange(client: PrismaService | Prisma.TransactionClient, expenseId: string): Promise<void> {
+    const isMatched = await this.recomputeIsMatched(client, expenseId);
+    const expense = await client.expense.findUniqueOrThrow({ where: { id: expenseId } });
 
     if (isMatched && expense.status === ExpenseStatus.READY_TO_MATCHING) {
-      await this.prisma.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_SETTLED } });
+      await client.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_SETTLED } });
     } else if (!isMatched && expense.status === ExpenseStatus.READY_TO_SETTLED) {
-      await this.prisma.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_MATCHING } });
+      await client.expense.update({ where: { id: expenseId }, data: { status: ExpenseStatus.READY_TO_MATCHING } });
     }
   }
 
@@ -440,7 +485,7 @@ export class BankMatchingService {
   private bestMatch(
     line: { amount: number; transactionDate: Date | null; rawDescription: string },
     candidates: Candidate[],
-  ): { expenseId: string | null; score: number } {
+  ): { expenseId: string | null; score: number; status: BankTxnStatus } {
     // Deterministic override: if amount AND calendar day both match exactly for
     // exactly one candidate, that's an unambiguous auto-match regardless of how
     // close a runner-up scores on weaker signals (date range / merchant name).
@@ -453,7 +498,7 @@ export class BankMatchingService {
           this.isSameCalendarDay(line.transactionDate as Date, c.expenseDate),
       );
       if (exactMatches.length === 1) {
-        return { expenseId: exactMatches[0].id, score: 100 };
+        return { expenseId: exactMatches[0].id, score: 100, status: BankTxnStatus.AUTO_MATCHED };
       }
     }
 
@@ -463,16 +508,25 @@ export class BankMatchingService {
       .filter((c) => c.score > 0)
       .sort((a, b) => b.score - a.score);
 
-    if (scored.length === 0) return { expenseId: null, score: 0 };
+    if (scored.length === 0) return { expenseId: null, score: 0, status: BankTxnStatus.UNMATCHED };
 
     const best = scored[0];
     const runnerUp = scored[1];
     // A tight race between the top two candidates means we're not confident
-    // enough to auto-match, even if the raw score cleared the threshold.
+    // enough to auto-match, even if the raw score cleared the threshold. The
+    // real score is still returned (not clamped to REVIEW_THRESHOLD) so the
+    // stored matchScore keeps its diagnostic value - only `status` reflects
+    // the margin-driven downgrade.
     if (best.score >= AUTO_MATCH_THRESHOLD && runnerUp && best.score - runnerUp.score < AUTO_MATCH_MARGIN) {
-      return { expenseId: best.id, score: REVIEW_THRESHOLD };
+      return { expenseId: best.id, score: best.score, status: BankTxnStatus.REVIEW_REQUIRED };
     }
-    return { expenseId: best.id, score: best.score };
+    const status =
+      best.score >= AUTO_MATCH_THRESHOLD
+        ? BankTxnStatus.AUTO_MATCHED
+        : best.score >= REVIEW_THRESHOLD
+        ? BankTxnStatus.REVIEW_REQUIRED
+        : BankTxnStatus.UNMATCHED;
+    return { expenseId: best.id, score: best.score, status };
   }
 
   // Compares calendar dates (UTC year/month/day) rather than raw millisecond
@@ -516,11 +570,11 @@ export class BankMatchingService {
     }
 
     const haystack = normalizedDescription;
-    if (
-      haystack.includes(normalizeName(candidate.advertiserName)) ||
-      haystack.includes(normalizeName(candidate.brandName)) ||
-      haystack.includes(normalizeName(candidate.salesName))
-    ) {
+    const needles = [candidate.advertiserName, candidate.brandName, candidate.salesName].map(normalizeName);
+    // An empty needle (name normalizes to nothing) must never "match" - every
+    // haystack.includes('') is trivially true, which would award the merchant
+    // bonus to every candidate for a line with no usable description.
+    if (needles.some((needle) => needle.length > 0 && haystack.includes(needle))) {
       score += MERCHANT_MATCH_SCORE;
     }
 

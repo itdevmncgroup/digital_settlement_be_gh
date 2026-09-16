@@ -14,8 +14,12 @@ export class BrandsController {
   constructor(private readonly service: BrandsService) {}
 
   @Get()
-  findAll(@Query('search') search?: string, @Query('advertiserIds') advertiserIds?: string) {
-    return this.service.findAll({ search, advertiserIds: advertiserIds ? advertiserIds.split(',').filter(Boolean) : undefined });
+  findAll(@Query('search') search?: string, @Query('advertiserIds') advertiserIds?: string, @Query('active') active?: string) {
+    return this.service.findAll({
+      search,
+      advertiserIds: advertiserIds ? advertiserIds.split(',').filter(Boolean) : undefined,
+      activeOnly: active === 'true',
+    });
   }
 
   @Get(':id')

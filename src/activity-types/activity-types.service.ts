@@ -7,8 +7,8 @@ import { CreateActivityTypeDto, UpdateActivityTypeDto } from './dto/activity-typ
 export class ActivityTypesService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll() {
-    return this.prisma.activityType.findMany({ orderBy: { name: 'asc' } });
+  findAll(activeOnly?: boolean) {
+    return this.prisma.activityType.findMany({ where: activeOnly ? { isActive: true } : undefined, orderBy: { name: 'asc' } });
   }
 
   async findOne(id: string) {

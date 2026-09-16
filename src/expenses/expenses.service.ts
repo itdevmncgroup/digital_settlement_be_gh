@@ -5,7 +5,7 @@ import { AuditService } from '../common/audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { canViewAllRecords, canAccessExpenseOwnedRecord } from '../common/rbac/scope.util';
+import { canViewAllRecords, canAccessExpenseOwnedRecord, getActorDepartmentIds } from '../common/rbac/scope.util';
 import { RoleName } from '../common/constants/role-name';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto/expense.dto';
 
@@ -30,6 +30,7 @@ const include = {
   activityType: true,
   costCenter: true,
   creditCard: true,
+  paymentMethod: true,
   department: true,
   items: { include: { category: true } },
   invoices: { include: { files: true } },
@@ -82,10 +83,10 @@ export class ExpensesService {
   // Back office (Admin/Finance/Supervisor/Management) sees everything, scoped
   // only by whatever query params they pass. Sales Admin is Department-scoped:
   // not a global back-office role, but should see every Sales' expense within
-  // their own Department (their own User.departmentId), not just their own
-  // records. A plain expense.read.owndept permission holder (e.g. a HEAD_POD/
-  // BOD Role approving for their Department - DepartmentPositionAssignment,
-  // not User.departmentId) gets the same Department-wide scoping via whichever
+  // their own Department(s) (their own UserDepartment membership(s)), not just
+  // their own records. A plain expense.read.owndept permission holder (e.g. a
+  // HEAD_POD/BOD Role approving for their Department - DepartmentPositionAssignment,
+  // not UserDepartment) gets the same Department-wide scoping via whichever
   // of the two sources actually covers them. Everyone else (plain Sales) only
   // ever sees their own.
   private async resolveScope(actor: AuthUser, q: ListFilter): Promise<ListFilter> {
@@ -107,15 +108,11 @@ export class ExpensesService {
   }
 
   // A caller's "own Department(s)" for *.owndept permissions - either their
-  // profile's own User.departmentId (e.g. SALES_ADMIN) or every Department
+  // own UserDepartment membership(s) (e.g. SALES_ADMIN) or every Department
   // they hold an active approval Position for (DepartmentPositionAssignment -
   // e.g. HEAD_POD), same two sources resolveScope() already reads for listing.
-  private async getManagedDepartmentIds(actorId: string): Promise<string[]> {
-    const [user, assignments] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } }),
-      this.prisma.departmentPositionAssignment.findMany({ where: { userId: actorId, status: 'ACTIVE' }, select: { departmentId: true } }),
-    ]);
-    return Array.from(new Set([...(user?.departmentId ? [user.departmentId] : []), ...assignments.map((a) => a.departmentId)]));
+  private getManagedDepartmentIds(actorId: string): Promise<string[]> {
+    return getActorDepartmentIds(this.prisma, actorId);
   }
 
   private buildWhere(filter: ListFilter): Prisma.ExpenseWhereInput {
@@ -229,7 +226,10 @@ export class ExpensesService {
 
     await this.assertCanCreateForDepartment(actorId, actorRoles, actorPermissions, departmentId);
 
-    if (dto.paymentMethodType === 'CREDIT_CARD' && dto.creditCardId) {
+    const paymentMethod = dto.paymentMethodId
+      ? await this.prisma.paymentMethod.findUnique({ where: { id: dto.paymentMethodId } })
+      : null;
+    if (paymentMethod?.code === 'CORPORATE_CARD' && dto.creditCardId) {
       await this.assertCreditCardMatchesDepartment(dto.creditCardId, departmentId);
     }
 
@@ -245,7 +245,7 @@ export class ExpensesService {
         brandId,
         activityTypeId,
         costCenterId: dto.costCenterId,
-        paymentMethodType: dto.paymentMethodType,
+        paymentMethodId: dto.paymentMethodId,
         paymentMethodNote: dto.paymentMethodNote,
         creditCardId: dto.creditCardId,
         merchantName: dto.merchantName,
@@ -291,9 +291,12 @@ export class ExpensesService {
 
     const nextStatus = before.status === ExpenseStatus.REJECTED ? ExpenseStatus.REVISION : before.status;
 
-    const effectivePaymentMethod = dto.paymentMethodType ?? before.paymentMethodType;
+    const effectivePaymentMethodId = dto.paymentMethodId ?? before.paymentMethodId;
+    const effectivePaymentMethod = effectivePaymentMethodId
+      ? await this.prisma.paymentMethod.findUnique({ where: { id: effectivePaymentMethodId } })
+      : null;
     const effectiveCreditCardId = dto.creditCardId ?? before.creditCardId;
-    if (effectivePaymentMethod === 'CREDIT_CARD' && effectiveCreditCardId) {
+    if (effectivePaymentMethod?.code === 'CORPORATE_CARD' && effectiveCreditCardId) {
       await this.assertCreditCardMatchesDepartment(effectiveCreditCardId, before.departmentId);
     }
 
@@ -317,7 +320,7 @@ export class ExpensesService {
         where: { id },
         data: {
           costCenterId: dto.costCenterId,
-          paymentMethodType: dto.paymentMethodType,
+          paymentMethodId: dto.paymentMethodId,
           paymentMethodNote: dto.paymentMethodNote,
           creditCardId: dto.creditCardId,
           merchantName: dto.merchantName,
@@ -451,7 +454,7 @@ export class ExpensesService {
   // expense.edit.all / expense.edit.owndept (Role/Permission master) - .all
   // grants edit access on any Sales' Expense the same way ADMIN/FINANCE
   // already does; .owndept extends that to just the Expenses whose Department
-  // the actor belongs to (User.departmentId - same source ExpensesService's
+  // the actor belongs to (UserDepartment - same source ExpensesService's
   // resolveScope() reads for listing).
   private async canEditExpense(
     expense: { departmentId: string | null },
@@ -461,8 +464,8 @@ export class ExpensesService {
   ): Promise<boolean> {
     if (this.isBackOffice(actorRoles) || actorPermissions.includes('expense.edit.all')) return true;
     if (actorPermissions.includes('expense.edit.owndept') && expense.departmentId) {
-      const actorUser = await this.prisma.user.findUnique({ where: { id: actorId }, select: { departmentId: true } });
-      if (actorUser?.departmentId === expense.departmentId) return true;
+      const actorDeptIds = await getActorDepartmentIds(this.prisma, actorId);
+      if (actorDeptIds.includes(expense.departmentId)) return true;
     }
     return false;
   }

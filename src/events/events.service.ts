@@ -70,9 +70,10 @@ export class EventsService {
     }
 
     // Department determines the Department-scoped Approval Level chain (BRD
-    // section 22-23 example). Defaults to the target Sales' own Department,
-    // overridable via dto.departmentId.
-    const departmentId = dto.departmentId ?? sales.departmentId;
+    // section 22-23 example). Defaults to the target Sales' own Department if
+    // they belong to exactly one; overridable via dto.departmentId, and
+    // required explicitly when the Sales belongs to zero or several.
+    const departmentId = dto.departmentId ?? (await this.resolveDefaultDepartmentId(targetSalesId));
 
     const eventNo = await this.generateEventNo();
 
@@ -124,7 +125,7 @@ export class EventsService {
       if (!sales?.unitId) throw new BadRequestException('Sales has no active Unit assignment');
       salesId = sales.id;
       unitId = sales.unitId;
-      departmentId = sales.departmentId;
+      departmentId = dto.departmentId ?? (await this.resolveDefaultDepartmentId(sales.id));
     }
 
     const event = await this.prisma.$transaction(async (tx) => {
@@ -192,6 +193,17 @@ export class EventsService {
 
   private isBackOffice(actorRoles: string[]): boolean {
     return actorRoles.some((r) => r === 'ADMIN' || r === 'FINANCE');
+  }
+
+  // Unambiguous only when the Sales belongs to exactly one Department -
+  // otherwise the caller must pass an explicit dto.departmentId.
+  private async resolveDefaultDepartmentId(salesId: string): Promise<string | undefined> {
+    const memberships = await this.prisma.userDepartment.findMany({
+      where: { userId: salesId, status: 'ACTIVE' },
+      select: { departmentId: true },
+    });
+    if (memberships.length === 1) return memberships[0].departmentId;
+    throw new BadRequestException('Department must be specified - Sales belongs to multiple or no Departments');
   }
 
   private async generateEventNo(): Promise<string> {

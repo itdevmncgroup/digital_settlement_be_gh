@@ -7,8 +7,8 @@ import { CreatePositionDto, UpdatePositionDto } from './dto/position.dto';
 export class PositionsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll() {
-    return this.prisma.position.findMany({ orderBy: { name: 'asc' } });
+  findAll(activeOnly?: boolean) {
+    return this.prisma.position.findMany({ where: activeOnly ? { isActive: true } : undefined, orderBy: { name: 'asc' } });
   }
 
   async findOne(id: string) {

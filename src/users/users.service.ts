@@ -5,7 +5,12 @@ import { AuditService } from '../common/audit/audit.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
-const userInclude = { roles: { include: { role: true } }, unit: true, position: true, department: true } as const;
+const userInclude = {
+  roles: { include: { role: true } },
+  unit: true,
+  position: true,
+  departments: { where: { status: 'ACTIVE' }, include: { department: true } },
+} as const;
 
 @Injectable()
 export class UsersService {
@@ -42,10 +47,10 @@ export class UsersService {
         email: dto.email,
         phone: dto.phone,
         positionId: dto.positionId,
-        departmentId: dto.departmentId,
         unitId: dto.unitId,
         passwordHash,
         roles: { create: roles.map((r) => ({ roleId: r.id })) },
+        departments: { create: (dto.departmentIds ?? []).map((departmentId) => ({ departmentId })) },
       },
       include: userInclude,
     });
@@ -58,7 +63,17 @@ export class UsersService {
     const before = await this.prisma.user.findUnique({ where: { id } });
     if (!before) throw new NotFoundException('User not found');
 
-    const user = await this.prisma.user.update({ where: { id }, data: dto, include: userInclude });
+    const { departmentIds, ...rest } = dto;
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: {
+        ...rest,
+        departments: departmentIds
+          ? { deleteMany: {}, create: departmentIds.map((departmentId) => ({ departmentId })) }
+          : undefined,
+      },
+      include: userInclude,
+    });
 
     await this.audit.log({
       userId: actorId,
@@ -100,7 +115,11 @@ export class UsersService {
   }
 
   private toPublic(user: any) {
-    const { passwordHash, ...rest } = user;
-    return { ...rest, roles: user.roles?.map((ur: any) => ur.role.name) ?? [] };
+    const { passwordHash, departments, ...rest } = user;
+    return {
+      ...rest,
+      roles: user.roles?.map((ur: any) => ur.role.name) ?? [],
+      departments: departments?.map((d: any) => d.department) ?? [],
+    };
   }
 }

@@ -17,18 +17,22 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { getActorDepartmentIds } from '../common/rbac/scope.util';
 import { EmailService } from '../email/email.service';
 import { ExternalSyncService } from '../external-sync/external-sync.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateApprovalLevelDto, UpdateApprovalLevelDto } from './dto/approval-level.dto';
 
 type ApprovalLevelWithSteps = ApprovalLevel & {
   steps: (ApprovalLevelStep & { position: Position })[];
-  department: { name: string } | null;
+  departments: { departmentId: string; department: { name: string } }[];
+  requestorPositions: { positionId: string; position: { name: string } }[];
 };
 
 const levelInclude = {
   steps: { include: { position: true }, orderBy: { stepOrder: 'asc' as const } },
-  department: true,
+  departments: { include: { department: true } },
+  requestorPositions: { include: { position: true } },
 };
 
 const requestInclude = {
@@ -57,6 +61,7 @@ export class ApprovalsService {
     private readonly email: EmailService,
     private readonly config: ConfigService,
     private readonly externalSync: ExternalSyncService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ---- Approval Levels (Admin, BRD section 26 -> System > Approval Level) ----
@@ -80,7 +85,8 @@ export class ApprovalsService {
         name: dto.name,
         documentStage: dto.documentStage,
         scopeType: dto.scopeType ?? ApprovalScopeType.ANY,
-        departmentId: dto.departmentId,
+        departments: { create: (dto.departmentIds ?? []).map((departmentId) => ({ departmentId })) },
+        requestorPositions: { create: (dto.requestorPositionIds ?? []).map((positionId) => ({ positionId })) },
         minAmount: dto.minAmount,
         maxAmount: dto.maxAmount,
         steps: { create: dto.steps.map((s, i) => ({ stepOrder: i, positionId: s.positionId })) },
@@ -97,12 +103,21 @@ export class ApprovalsService {
       if (dto.steps) {
         await tx.approvalLevelStep.deleteMany({ where: { approvalLevelId: id } });
       }
+      if (dto.departmentIds) {
+        await tx.approvalLevelDepartment.deleteMany({ where: { approvalLevelId: id } });
+      }
+      if (dto.requestorPositionIds) {
+        await tx.approvalLevelRequestorPosition.deleteMany({ where: { approvalLevelId: id } });
+      }
       return tx.approvalLevel.update({
         where: { id },
         data: {
           name: dto.name,
           scopeType: dto.scopeType,
-          departmentId: dto.departmentId,
+          departments: dto.departmentIds ? { create: dto.departmentIds.map((departmentId) => ({ departmentId })) } : undefined,
+          requestorPositions: dto.requestorPositionIds
+            ? { create: dto.requestorPositionIds.map((positionId) => ({ positionId })) }
+            : undefined,
           minAmount: dto.minAmount,
           maxAmount: dto.maxAmount,
           isActive: dto.isActive,
@@ -119,7 +134,7 @@ export class ApprovalsService {
 
   private async resolveApprovalLevel(
     tx: Prisma.TransactionClient,
-    params: { documentStage: DocumentStage; departmentId?: string; amount: number },
+    params: { documentStage: DocumentStage; departmentId?: string; amount: number; requestorPositionId?: string },
   ): Promise<ApprovalLevelWithSteps | null> {
     const levels = await tx.approvalLevel.findMany({
       where: { isActive: true, documentStage: params.documentStage },
@@ -131,23 +146,65 @@ export class ApprovalsService {
       const max = level.maxAmount === null ? null : Number(level.maxAmount);
       const amountMatches = params.amount >= min && (max === null || params.amount <= max);
       if (!amountMatches) return false;
-      if (level.scopeType === ApprovalScopeType.DEPARTMENT) return !!params.departmentId && level.departmentId === params.departmentId;
-      return true; // ANY
+      if (level.scopeType === ApprovalScopeType.DEPARTMENT) {
+        if (!params.departmentId || !level.departments.some((d) => d.departmentId === params.departmentId)) return false;
+      }
+      // requestorPositions is an independent filter on top of scopeType - a Level
+      // with none configured matches any requestor (backward compatible).
+      if (level.requestorPositions.length > 0) {
+        if (!params.requestorPositionId || !level.requestorPositions.some((p) => p.positionId === params.requestorPositionId)) {
+          return false;
+        }
+      }
+      return true;
     });
 
     if (matches.length === 0) return null;
 
-    // Scope precedence: DEPARTMENT exact-match > ANY; ties broken by
-    // most-recently-updated (admin responsibility to avoid overlapping ranges).
-    const rank = (l: (typeof matches)[number]) => (l.scopeType === ApprovalScopeType.DEPARTMENT ? 0 : 1);
+    // Precedence: requestor-scoped + DEPARTMENT exact-match > requestor-scoped
+    // only > DEPARTMENT only > ANY; ties broken by most-recently-updated (admin
+    // responsibility to avoid overlapping ranges).
+    const rank = (l: (typeof matches)[number]) => {
+      const dept = l.scopeType === ApprovalScopeType.DEPARTMENT ? 0 : 1;
+      const requestor = l.requestorPositions.length > 0 ? 0 : 1;
+      return dept * 2 + requestor;
+    };
     matches.sort((a, b) => rank(a) - rank(b) || b.updatedAt.getTime() - a.updatedAt.getTime());
     return matches[0];
   }
 
-  private async resolveApprover(tx: Prisma.TransactionClient, level: ApprovalLevelWithSteps, positionId: string) {
+  // Expense.sales / Event.sales / Settlement.createdBy is "the requestor" whose
+  // Position an ApprovalLevel.requestorPositions filter is matched against.
+  private async resolveRequestorPositionId(
+    tx: Prisma.TransactionClient,
+    params: { expenseId?: string; eventId?: string; settlementId?: string },
+  ): Promise<string | undefined> {
+    if (params.expenseId) {
+      const expense = await tx.expense.findUnique({ where: { id: params.expenseId }, select: { sales: { select: { positionId: true } } } });
+      return expense?.sales.positionId ?? undefined;
+    }
+    if (params.eventId) {
+      const event = await tx.event.findUnique({ where: { id: params.eventId }, select: { sales: { select: { positionId: true } } } });
+      return event?.sales.positionId ?? undefined;
+    }
+    if (params.settlementId) {
+      const settlement = await tx.settlement.findUnique({
+        where: { id: params.settlementId },
+        select: { createdBy: { select: { positionId: true } } },
+      });
+      return settlement?.createdBy.positionId ?? undefined;
+    }
+    return undefined;
+  }
+
+  // documentDepartmentId is the actual Expense/Event/Settlement's own Department,
+  // not "the Level's Department" - a DEPARTMENT-scope Level can span several (see
+  // ApprovalLevel comment in schema.prisma), so each step still resolves against
+  // one concrete Department's DepartmentPositionAssignment row.
+  private async resolveApprover(tx: Prisma.TransactionClient, level: ApprovalLevelWithSteps, positionId: string, documentDepartmentId?: string) {
     if (level.scopeType === ApprovalScopeType.DEPARTMENT) {
       const assignment = await tx.departmentPositionAssignment.findUnique({
-        where: { departmentId_positionId: { departmentId: level.departmentId as string, positionId } },
+        where: { departmentId_positionId: { departmentId: documentDepartmentId as string, positionId } },
         include: { user: true },
       });
       return assignment && assignment.status === 'ACTIVE' && assignment.user.status === 'ACTIVE' ? assignment.user : null;
@@ -170,10 +227,16 @@ export class ApprovalsService {
     },
   ) {
     const amountNum = Number(params.amount);
+    const requestorPositionId = await this.resolveRequestorPositionId(tx, {
+      expenseId: params.expenseId,
+      eventId: params.eventId,
+      settlementId: params.settlementId,
+    });
     const level = await this.resolveApprovalLevel(tx, {
       documentStage: params.documentStage,
       departmentId: params.departmentId ?? undefined,
       amount: amountNum,
+      requestorPositionId,
     });
     if (!level) {
       throw new BadRequestException(
@@ -184,9 +247,12 @@ export class ApprovalsService {
     const missing: string[] = [];
     const resolvedSteps: { stepOrder: number; positionId: string; resolvedApproverId: string; status: ApprovalStepStatus }[] = [];
     for (const step of level.steps) {
-      const approver = await this.resolveApprover(tx, level, step.positionId);
+      const approver = await this.resolveApprover(tx, level, step.positionId, params.departmentId ?? undefined);
       if (!approver) {
-        const scopeLabel = level.scopeType === ApprovalScopeType.DEPARTMENT ? `Department "${level.department?.name}"` : 'the organization';
+        const scopeLabel =
+          level.scopeType === ApprovalScopeType.DEPARTMENT
+            ? `Department "${level.departments.find((d) => d.departmentId === params.departmentId)?.department.name ?? params.departmentId}"`
+            : 'the organization';
         missing.push(`no user assigned as "${step.position.name}" for ${scopeLabel}`);
       } else {
         resolvedSteps.push({ stepOrder: step.stepOrder, positionId: step.positionId, resolvedApproverId: approver.id, status: ApprovalStepStatus.PENDING });
@@ -233,12 +299,19 @@ export class ApprovalsService {
 
     const step0 = request.steps.find((s) => s.stepOrder === 0);
     if (step0) {
-      await this.notifyStep(tx, { documentStage: params.documentStage, expenseId: params.expenseId, eventId: params.eventId, step: step0 });
+      await this.notifyStep(tx, {
+        documentStage: params.documentStage,
+        expenseId: params.expenseId,
+        eventId: params.eventId,
+        settlementId: params.settlementId,
+        step: step0,
+      });
     }
     return request;
   }
 
-  // ---- Approval-via-email (one-click token links) ----
+  // ---- Approval-via-email (one-click token links for Expense/Event; a plain
+  // deep-link notice for Settlement - see notifyStep) ----
 
   private async resolveDocInfo(tx: Prisma.TransactionClient, target: { expenseId?: string; eventId?: string }) {
     if (target.expenseId) {
@@ -249,6 +322,24 @@ export class ApprovalsService {
     return { docNo: e.eventNo, salesName: e.sales.name, purpose: e.purpose, amount: e.estimatedAmount };
   }
 
+  private async resolveSettlementInfo(tx: Prisma.TransactionClient, settlementId: string) {
+    const s = await tx.settlement.findUniqueOrThrow({
+      where: { id: settlementId },
+      include: {
+        createdBy: true,
+        department: true,
+        expenses: { include: { sales: true }, orderBy: { expenseDate: 'asc' } },
+      },
+    });
+    return {
+      settlementNo: s.settlementNo,
+      createdByName: s.createdBy.name,
+      departmentName: s.department.name,
+      totalAmount: s.totalAmount,
+      expenses: s.expenses.map((e) => ({ expenseNo: e.expenseNo, salesName: e.sales.name, purpose: e.purpose, amount: e.amount })),
+    };
+  }
+
   private async issueStepToken(tx: Prisma.TransactionClient, stepId: string): Promise<string> {
     const token = randomBytes(32).toString('hex');
     const ttlDays = Number(this.config.get<string>('APPROVAL_EMAIL_TOKEN_TTL_DAYS')) || 7;
@@ -257,19 +348,70 @@ export class ApprovalsService {
     return token;
   }
 
-  // Mails the current step's approver a one-click Approve link plus a Reject
-  // link (which opens a small reason-entry page - a reject reason is required
-  // and can't be captured from a bare GET link). Fire-and-forget: a failed
-  // send is logged but never blocks or fails the approval workflow itself.
+  // Mails the current step's approver, then records the same event in-app +
+  // push (NotificationsService). Both are best-effort: a failure here is
+  // logged but never blocks or fails the approval workflow itself.
+  //
+  // Expense/Event get a one-click Approve link plus a Reject link (which opens
+  // a small reason-entry page - a reject reason is required and can't be
+  // captured from a bare GET link). Settlement does NOT get a one-click link:
+  // a Settlement tier requires the approver to review every member Expense
+  // individually before submitting the whole batch (submitSettlementTier
+  // below), so a blind email click can't stand in for that - the email just
+  // deep-links into the settlement (mobile app via App Link if installed,
+  // web app otherwise) for the approver to review normally.
   private async notifyStep(
     tx: Prisma.TransactionClient,
-    params: { documentStage: DocumentStage; expenseId?: string; eventId?: string; step: { id: string; positionId: string; resolvedApproverId: string } },
+    params: {
+      documentStage: DocumentStage;
+      expenseId?: string;
+      eventId?: string;
+      settlementId?: string;
+      step: { id: string; positionId: string; resolvedApproverId: string };
+    },
   ) {
-    // Settlement-stage requests hang off a Settlement, not an Expense/Event, and
-    // resolveDocInfo only knows how to describe those two - skip the email (and
-    // its one-click token) rather than fail the transaction over a best-effort
-    // notification. The Approvals UI is the path for that document type.
-    if (!params.expenseId && !params.eventId) return;
+    const appBase = this.config.get<string>('APP_PUBLIC_URL') || 'http://localhost:3001';
+
+    if (params.settlementId) {
+      const settlementId = params.settlementId;
+      try {
+        const [settlement, approver, position] = await Promise.all([
+          this.resolveSettlementInfo(tx, settlementId),
+          tx.user.findUniqueOrThrow({ where: { id: params.step.resolvedApproverId } }),
+          tx.position.findUniqueOrThrow({ where: { id: params.step.positionId } }),
+        ]);
+        const currency = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+        await this.email.sendSettlementApprovalNotice({
+          to: approver.email,
+          approverName: approver.name,
+          positionName: position.name,
+          settlementNo: settlement.settlementNo,
+          departmentName: settlement.departmentName,
+          createdByName: settlement.createdByName,
+          totalAmount: currency.format(Number(settlement.totalAmount)),
+          openUrl: `${appBase}/settlement?open=${settlementId}`,
+          expenses: settlement.expenses.map((e) => ({
+            expenseNo: e.expenseNo,
+            salesName: e.salesName,
+            purpose: e.purpose,
+            amount: currency.format(Number(e.amount)),
+          })),
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to send settlement approval email: ${(err as Error).message}`);
+      }
+      await this.notifications.notify({
+        userId: params.step.resolvedApproverId,
+        type: 'SETTLEMENT_PENDING',
+        title: 'Settlement awaiting your approval',
+        body: `A settlement batch needs your review.`,
+        deepLink: `/settlement?open=${settlementId}`,
+        objectType: 'Settlement',
+        objectId: settlementId,
+      });
+      return;
+    }
+
     try {
       const [doc, approver, position, token] = await Promise.all([
         this.resolveDocInfo(tx, params),
@@ -278,7 +420,6 @@ export class ApprovalsService {
         this.issueStepToken(tx, params.step.id),
       ]);
       const apiBase = this.config.get<string>('API_PUBLIC_URL') || 'http://localhost:3000/api/v1';
-      const appBase = this.config.get<string>('APP_PUBLIC_URL') || 'http://localhost:3001';
       await this.email.sendApprovalRequest({
         to: approver.email,
         approverName: approver.name,
@@ -294,6 +435,18 @@ export class ApprovalsService {
     } catch (err) {
       this.logger.warn(`Failed to send approval email: ${(err as Error).message}`);
     }
+
+    const objectType = params.expenseId ? 'Expense' : 'Event';
+    const objectId = (params.expenseId ?? params.eventId) as string;
+    await this.notifications.notify({
+      userId: params.step.resolvedApproverId,
+      type: params.expenseId ? 'EXPENSE_PENDING' : 'EVENT_PENDING',
+      title: `${objectType} awaiting your approval`,
+      body: `A ${objectType.toLowerCase()} needs your review.`,
+      deepLink: params.expenseId ? `/expenses/${objectId}` : `/events/${objectId}`,
+      objectType,
+      objectId,
+    });
   }
 
   async getTokenInfo(token: string) {
@@ -384,7 +537,7 @@ export class ApprovalsService {
     if (actorPermissions.includes('expense.approve.all')) {
       orConditions.push({ approvalRequest: { expenseId: { not: null } } });
     } else if (actorPermissions.includes('expense.approve.owndept')) {
-      const ownDepartmentIds = await this.getActorDepartmentIds(this.prisma, actorId);
+      const ownDepartmentIds = await getActorDepartmentIds(this.prisma, actorId);
       if (ownDepartmentIds.length > 0) {
         orConditions.push({ approvalRequest: { expense: { departmentId: { in: ownDepartmentIds } } } });
       }
@@ -394,7 +547,7 @@ export class ApprovalsService {
     if (canReadAll) {
       orConditions.push({ approvalRequest: { expenseId: { not: null } } });
     } else if (canReadOwnDept) {
-      readDepartmentIds = await this.getActorDepartmentIds(this.prisma, actorId);
+      readDepartmentIds = await getActorDepartmentIds(this.prisma, actorId);
       if (readDepartmentIds.length > 0) {
         orConditions.push({ approvalRequest: { expense: { departmentId: { in: readDepartmentIds } } } });
       }
@@ -513,26 +666,13 @@ export class ApprovalsService {
     if (actorPermissions.includes('expense.approve.owndept') && target.expenseId) {
       const expense = await tx.expense.findUnique({ where: { id: target.expenseId }, select: { departmentId: true } });
       if (expense?.departmentId) {
-        const ownDepartmentIds = await this.getActorDepartmentIds(tx, actorId);
+        const ownDepartmentIds = await getActorDepartmentIds(tx, actorId);
         if (ownDepartmentIds.includes(expense.departmentId)) {
           return;
         }
       }
     }
     throw new ForbiddenException('You are not the assigned approver for this step');
-  }
-
-  // A user's "own Department(s)": their own User.departmentId covers a Sales/
-  // Sales Admin belonging to a Department, DepartmentPositionAssignment covers
-  // a Supervisor holding an approval position for a Department.
-  private async getActorDepartmentIds(tx: Prisma.TransactionClient, actorId: string): Promise<string[]> {
-    const [user, assignments] = await Promise.all([
-      tx.user.findUnique({ where: { id: actorId }, select: { departmentId: true } }),
-      tx.departmentPositionAssignment.findMany({ where: { userId: actorId, status: 'ACTIVE' }, select: { departmentId: true } }),
-    ]);
-    const ids = new Set(assignments.map((a) => a.departmentId));
-    if (user?.departmentId) ids.add(user.departmentId);
-    return Array.from(ids);
   }
 
   // Expense.status mirrors whichever approval tier is currently reviewing it - one
@@ -717,11 +857,26 @@ export class ApprovalsService {
       });
 
       if (isFinalStep) {
-        await tx.settlement.update({ where: { id: settlementId }, data: { status: SettlementStatus.COMPLETE } });
+        const settlement = await tx.settlement.update({
+          where: { id: settlementId },
+          data: { status: SettlementStatus.COMPLETE },
+        });
         await tx.expense.updateMany({ where: { settlementId }, data: { status: ExpenseStatus.COMPLETE } });
+        await this.notifications.notify({
+          userId: settlement.createdById,
+          type: 'SETTLEMENT_COMPLETE',
+          title: 'Settlement complete',
+          body: `Settlement has cleared its final approval tier.`,
+          deepLink: `/settlement?open=${settlementId}`,
+          objectType: 'Settlement',
+          objectId: settlementId,
+        });
       } else {
         const nextStepRow = request.steps.find((s) => s.stepOrder === nextStep);
         await this.applyTierStatus(tx, settlementId, nextStepRow?.position.code ?? '');
+        if (nextStepRow) {
+          await this.notifyStep(tx, { documentStage: DocumentStage.SETTLEMENT, settlementId, step: nextStepRow });
+        }
       }
 
       await this.audit.log({
@@ -861,6 +1016,19 @@ export class ApprovalsService {
         objectId: (target.expenseId ?? target.eventId) as string,
         newValue: { position: step.positionId, reason, documentStage: request.documentStage },
       });
+
+      const submitterId = expense?.salesId ?? event?.salesId;
+      if (submitterId) {
+        await this.notifications.notify({
+          userId: submitterId,
+          type: expense ? 'EXPENSE_REJECTED' : 'EVENT_REJECTED',
+          title: `${expense ? 'Expense' : 'Event'} rejected`,
+          body: reason || `Rejected at ${step.positionId} step.`,
+          deepLink: expense ? `/expenses/${expense.id}` : `/events/${event?.id}`,
+          objectType: expense ? 'Expense' : 'Event',
+          objectId: (expense?.id ?? event?.id) as string,
+        });
+      }
 
       return { approvalRequest: updated, expense, event };
     });

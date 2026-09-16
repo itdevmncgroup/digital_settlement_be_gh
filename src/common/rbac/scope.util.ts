@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { RoleName } from '../constants/role-name';
 import { AuthUser } from '../decorators/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -9,15 +10,33 @@ export function canViewAllRecords(user: AuthUser): boolean {
   return user.roles.some((r) => BACK_OFFICE_ROLES.includes(r));
 }
 
+/**
+ * A user's "own Department(s)": their UserDepartment membership rows (a
+ * Sales/Sales Admin belonging to one or more Departments) plus any Department
+ * they hold an active approval Position for (DepartmentPositionAssignment -
+ * e.g. HEAD_POD, a Supervisor's "own" Department is never a membership row).
+ * Shared by every service that used to compare a single User.departmentId.
+ */
+export async function getActorDepartmentIds(
+  prisma: PrismaService | Prisma.TransactionClient,
+  userId: string,
+): Promise<string[]> {
+  const [memberships, assignments] = await Promise.all([
+    prisma.userDepartment.findMany({ where: { userId, status: 'ACTIVE' }, select: { departmentId: true } }),
+    prisma.departmentPositionAssignment.findMany({ where: { userId, status: 'ACTIVE' }, select: { departmentId: true } }),
+  ]);
+  return Array.from(new Set([...memberships.map((m) => m.departmentId), ...assignments.map((a) => a.departmentId)]));
+}
+
 const OWNDEPT_EXPENSE_PERMISSIONS = ['expense.read.owndept', 'expense.approve.owndept', 'expense.edit.owndept'];
 const ALL_EXPENSE_PERMISSIONS = ['expense.read.all', 'expense.approve.all', 'expense.edit.all'];
 
 /**
  * True if the actor may view an Expense-owned record (photo, invoice/file) that
  * isn't theirs: back-office roles per canViewAllRecords(), an expense.*.all
- * permission holder, a SALES_ADMIN whose Department (User.departmentId) covers
+ * permission holder, a SALES_ADMIN whose Department(s) (UserDepartment) cover
  * the expense's Department, or an expense.*.owndept permission holder (e.g. a
- * HEAD/BOD approver - DepartmentPositionAssignment, not User.departmentId)
+ * HEAD/BOD approver - DepartmentPositionAssignment, not UserDepartment)
  * whose own Department(s) cover it - same Department-scoping ExpensesService's
  * resolveScope()/canEditExpense() already apply elsewhere, extended here so
  * photos/invoices don't 403 while the expense row (and its Approve button)
@@ -32,24 +51,17 @@ export async function canAccessExpenseOwnedRecord(
   if (canViewAllRecords(actor)) return true;
   if (actor.permissions?.some((p) => ALL_EXPENSE_PERMISSIONS.includes(p))) return true;
   if (actor.permissions?.some((p) => OWNDEPT_EXPENSE_PERMISSIONS.includes(p))) {
-    const [sales, hasAnyAssignment] = await Promise.all([
-      prisma.user.findUnique({ where: { id: actor.userId }, select: { departmentId: true } }),
-      prisma.departmentPositionAssignment.findFirst({ where: { userId: actor.userId, status: 'ACTIVE' } }),
-    ]);
+    const actorDeptIds = await getActorDepartmentIds(prisma, actor.userId);
     // No Department on the actor's own profile and no per-Department assignment
     // means their position sits above Department level (e.g. Co-Chief Sales
     // Officer) - they can access every Department's owned records.
-    if (!sales?.departmentId && !hasAnyAssignment) return true;
-    if (sales?.departmentId && sales.departmentId === owner.departmentId) return true;
-    if (owner.departmentId) {
-      const assignment = await prisma.departmentPositionAssignment.findFirst({ where: { userId: actor.userId, departmentId: owner.departmentId, status: 'ACTIVE' } });
-      if (assignment) return true;
-    }
+    if (actorDeptIds.length === 0) return true;
+    if (owner.departmentId && actorDeptIds.includes(owner.departmentId)) return true;
   }
   if (!owner.departmentId) return false;
   if (actor.roles.includes(RoleName.SALES_ADMIN)) {
-    const sales = await prisma.user.findUnique({ where: { id: actor.userId }, select: { departmentId: true } });
-    if (sales?.departmentId === owner.departmentId) return true;
+    const actorDeptIds = await getActorDepartmentIds(prisma, actor.userId);
+    if (actorDeptIds.includes(owner.departmentId)) return true;
   }
   return false;
 }

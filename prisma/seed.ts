@@ -55,6 +55,8 @@ async function main() {
     'settlement.create.owndept',
     'dashboard.read.all',
     'dashboard.read.owndept',
+    'audit-report.read.all',
+    'audit-report.read.owndept',
     'master.manage',
     'user.manage',
     'report.export',
@@ -205,6 +207,15 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
     ].map((c) => prisma.expenseCategory.upsert({ where: { code: c.code }, update: {}, create: c })),
   );
 
+  await Promise.all(
+    [
+      { code: 'AP_DISBURSEMENT', name: 'AP Disbursement' },
+      { code: 'CORPORATE_CARD', name: 'Corporate Card' },
+      { code: 'PETTY_CASH', name: 'Petty Cash' },
+      { code: 'REIMBURSEMENT', name: 'Reimbursement' },
+    ].map((m) => prisma.paymentMethod.upsert({ where: { code: m.code }, update: {}, create: m })),
+  );
+
   async function findOrCreateMerchant(name: string, alias: string[]) {
     const normalizedName = name.toUpperCase();
     const existing = await prisma.merchant.findFirst({ where: { normalizedName } });
@@ -228,14 +239,17 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
     unitId: string;
     role: RoleName;
     positionId?: string;
-    departmentId?: string;
+    departmentIds?: string[];
   }) {
     const existing = await prisma.user.findUnique({ where: { email: input.email } });
     if (existing) {
-      if (input.positionId || input.departmentId) {
-        return prisma.user.update({
-          where: { id: existing.id },
-          data: { positionId: input.positionId, departmentId: input.departmentId },
+      if (input.positionId) {
+        await prisma.user.update({ where: { id: existing.id }, data: { positionId: input.positionId } });
+      }
+      if (input.departmentIds) {
+        await prisma.userDepartment.createMany({
+          data: input.departmentIds.map((departmentId) => ({ userId: existing.id, departmentId })),
+          skipDuplicates: true,
         });
       }
       return existing;
@@ -247,9 +261,9 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
         email: input.email,
         unitId: input.unitId,
         positionId: input.positionId,
-        departmentId: input.departmentId,
         passwordHash,
         roles: { create: [{ roleId: roles[input.role].id }] },
+        departments: { create: (input.departmentIds ?? []).map((departmentId) => ({ departmentId })) },
       },
     });
   }
@@ -261,30 +275,30 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
   const siti = await createUser({ employeeId: 'SLS-0002', name: 'Siti Rahma', email: 'siti.rahma@example.com', unitId: unitMnctvId, role: RoleName.SALES });
   const andi = await createUser({
     employeeId: 'SPV-0001', name: 'Andi Wijaya', email: 'andi.wijaya@example.com', unitId: unitRctiId, role: RoleName.SUPERVISOR,
-    positionId: positions.SUPERVISOR.id, departmentId: deptSalesMkt.id,
+    positionId: positions.SUPERVISOR.id, departmentIds: [deptSalesMkt.id],
   });
   const rina = await createUser({ employeeId: 'FIN-0001', name: 'Rina Kartika', email: 'rina.kartika@example.com', unitId: unitHoldingId, role: RoleName.FINANCE });
   const bambang = await createUser({
     employeeId: 'MGT-0001', name: 'Bambang Hartono', email: 'bambang.hartono@example.com', unitId: unitHoldingId, role: RoleName.MANAGEMENT,
-    positionId: positions.DIV_HEAD.id, departmentId: deptSalesMkt.id,
+    positionId: positions.DIV_HEAD.id, departmentIds: [deptSalesMkt.id],
   });
   // Approval-chain-only Position holders (BRD section 22 example): Head POD/Koordinator
   // for the two demo PODs below, plus Department Head/BOD for the Settlement chain.
   const yusuf = await createUser({
     employeeId: 'POS-0001', name: 'Yusuf Pratama', email: 'yusuf.pratama@example.com', unitId: unitRctiId, role: RoleName.SUPERVISOR,
-    positionId: positions.HEAD_POD.id, departmentId: deptSalesMkt.id,
+    positionId: positions.HEAD_POD.id, departmentIds: [deptSalesMkt.id],
   });
   const dewi = await createUser({
     employeeId: 'POS-0002', name: 'Dewi Anggraini', email: 'dewi.anggraini@example.com', unitId: unitMnctvId, role: RoleName.SUPERVISOR,
-    positionId: positions.KOORDINATOR.id, departmentId: deptSalesMkt.id,
+    positionId: positions.KOORDINATOR.id, departmentIds: [deptSalesMkt.id],
   });
   const hendra = await createUser({
     employeeId: 'POS-0003', name: 'Hendra Gunawan', email: 'hendra.gunawan@example.com', unitId: unitHoldingId, role: RoleName.MANAGEMENT,
-    positionId: positions.DEPT_HEAD.id, departmentId: deptSalesMkt.id,
+    positionId: positions.DEPT_HEAD.id, departmentIds: [deptSalesMkt.id],
   });
   const diana = await createUser({
     employeeId: 'POS-0004', name: 'Diana Puspita', email: 'diana.puspita@example.com', unitId: unitHoldingId, role: RoleName.MANAGEMENT,
-    positionId: positions.BOD.id, departmentId: deptSalesMkt.id,
+    positionId: positions.BOD.id, departmentIds: [deptSalesMkt.id],
   });
 
   const effectiveDate = new Date('2026-01-01');
@@ -298,10 +312,10 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
   }
 
   // Department (coverage-group flavor) = a named coverage group covering one
-  // or more Sales (via User.departmentId), containing Agency<->Brand pairs
+  // or more Sales (via UserDepartment), containing Agency<->Brand pairs
   // (BRD section 6.2, formerly the separate "Pod" concept). find-or-create by
   // name so re-running seed doesn't duplicate rows; the given salesId's own
-  // departmentId is (re)pointed at it if not already (idempotent).
+  // membership is added if not already present (idempotent).
   async function findOrCreateCoverageDepartment(input: {
     name: string;
     salesId: string;
@@ -316,10 +330,11 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
           assignments: { create: input.assignments.map((a) => ({ ...a, effectiveDate })) },
         },
       }));
-    const sales = await prisma.user.findUniqueOrThrow({ where: { id: input.salesId } });
-    if (sales.departmentId !== department.id) {
-      await prisma.user.update({ where: { id: input.salesId }, data: { departmentId: department.id } });
-    }
+    await prisma.userDepartment.upsert({
+      where: { userId_departmentId: { userId: input.salesId, departmentId: department.id } },
+      update: {},
+      create: { userId: input.salesId, departmentId: department.id },
+    });
     return department;
   }
 
@@ -363,7 +378,7 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
     name: string;
     documentStage: DocumentStage;
     scopeType: ApprovalScopeType;
-    departmentId?: string;
+    departmentIds?: string[];
     stepPositionCodes: string[];
   }) {
     const existing = await prisma.approvalLevel.findFirst({ where: { name: input.name } });
@@ -373,7 +388,7 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
         name: input.name,
         documentStage: input.documentStage,
         scopeType: input.scopeType,
-        departmentId: input.departmentId,
+        departments: { create: (input.departmentIds ?? []).map((departmentId) => ({ departmentId })) },
         minAmount: 0,
         steps: {
           create: input.stepPositionCodes.map((code, i) => ({ stepOrder: i, positionId: positions[code].id })),
@@ -383,11 +398,11 @@ async function seedDemoData(unitHoldingId: string, unitRctiId: string, unitMnctv
   }
   const preEventPod1Level = await findOrCreateApprovalLevel({
     name: 'Pre-Event - POD 1 (Budi)', documentStage: DocumentStage.PRE_EVENT, scopeType: ApprovalScopeType.DEPARTMENT,
-    departmentId: deptBudi.id, stepPositionCodes: ['HEAD_POD', 'SUPERVISOR'],
+    departmentIds: [deptBudi.id], stepPositionCodes: ['HEAD_POD', 'SUPERVISOR'],
   });
   await findOrCreateApprovalLevel({
     name: 'Pre-Event - POD 2 (Siti)', documentStage: DocumentStage.PRE_EVENT, scopeType: ApprovalScopeType.DEPARTMENT,
-    departmentId: deptSiti.id, stepPositionCodes: ['KOORDINATOR', 'SUPERVISOR', 'DEPT_HEAD'],
+    departmentIds: [deptSiti.id], stepPositionCodes: ['KOORDINATOR', 'SUPERVISOR', 'DEPT_HEAD'],
   });
   const settlementLevel = await findOrCreateApprovalLevel({
     name: 'Settlement - Standard', documentStage: DocumentStage.SETTLEMENT, scopeType: ApprovalScopeType.ANY,
@@ -662,7 +677,7 @@ const BRAND_WORDS_C = ['Prima', 'Plus', 'Gold', 'Fresh', 'Elite', 'Utama'];
 // curated seedDemoData() walkthrough above: 10 Agencies, each with 10
 // Advertisers (100 total), each with 10 Brands (1000 total); 50 Sales users
 // split 5-per-Department across 10 Departments named "POD 1".."POD 10" (each
-// Sales' own User.departmentId points at their Department - formerly a
+// Sales gets a UserDepartment row pointing at their Department - formerly a
 // separate "Pod"/PodMember concept). Guarded on the AGY01 agency code so
 // re-running seed is a no-op.
 async function seedBulkPodDemo(unitRctiId: string, unitMnctvId: string, unitGtvId: string) {
@@ -735,7 +750,7 @@ async function seedBulkPodDemo(unitRctiId: string, unitMnctvId: string, unitGtvI
   }
 
   // --- 10 Departments ("POD 1".."POD 10"), created up front so each Sales'
-  // own User.departmentId can point straight at theirs. ---
+  // UserDepartment row can point straight at theirs. ---
   const deptDefs = Array.from({ length: 10 }, (_, i) => ({ name: `POD ${i + 1}` }));
   await prisma.department.createMany({ data: deptDefs, skipDuplicates: true });
   const departments = await prisma.department.findMany({ where: { name: { in: deptDefs.map((d) => d.name) } } });
@@ -763,10 +778,14 @@ async function seedBulkPodDemo(unitRctiId: string, unitMnctvId: string, unitGtvI
       passwordHash,
     };
   });
-  await prisma.user.createMany({ data: salesUsersData });
+  await prisma.user.createMany({ data: salesUsersData.map(({ departmentId, ...rest }) => rest) });
   const salesUsers = await prisma.user.findMany({
     where: { email: { in: salesUsersData.map((s) => s.email) } },
     orderBy: { employeeId: 'asc' },
+  });
+  const departmentIdByEmail = new Map(salesUsersData.map((s) => [s.email, s.departmentId]));
+  await prisma.userDepartment.createMany({
+    data: salesUsers.map((u) => ({ userId: u.id, departmentId: departmentIdByEmail.get(u.email)! })),
   });
 
   await prisma.userRole.createMany({ data: salesUsers.map((u) => ({ userId: u.id, roleId: salesRole.id })) });

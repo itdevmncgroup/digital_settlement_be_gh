@@ -3,6 +3,7 @@
  * uppercase, strip punctuation, collapse whitespace, standardize PT/CV prefixes.
  */
 export function normalizeName(raw: string): string {
+  if (!raw) return '';
   let value = raw.toUpperCase().trim();
   value = value.replace(/[.,'"`]/g, '');
   value = value.replace(/^PT\s+/, 'PT ');

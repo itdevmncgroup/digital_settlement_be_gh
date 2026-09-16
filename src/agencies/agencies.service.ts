@@ -10,8 +10,11 @@ import { CreateAgencyDto, UpdateAgencyDto } from './dto/agency.dto';
 export class AgenciesService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll(search?: string) {
-    return this.prisma.agency.findMany({ where: codeNameWhere(search), orderBy: { name: 'asc' } });
+  findAll(search?: string, activeOnly?: boolean) {
+    return this.prisma.agency.findMany({
+      where: { ...codeNameWhere(search), isActive: activeOnly ? true : undefined },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async findOne(id: string) {

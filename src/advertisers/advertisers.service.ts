@@ -11,9 +11,9 @@ import { CreateAdvertiserDto, UpdateAdvertiserDto } from './dto/advertiser.dto';
 export class AdvertisersService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll(filter: { search?: string; agencyId?: string } = {}) {
+  findAll(filter: { search?: string; agencyId?: string; activeOnly?: boolean } = {}) {
     return this.prisma.advertiser.findMany({
-      where: { ...codeNameWhere(filter.search), agencyId: filter.agencyId },
+      where: { ...codeNameWhere(filter.search), agencyId: filter.agencyId, isActive: filter.activeOnly ? true : undefined },
       include: { agency: true },
       orderBy: { name: 'asc' },
     });

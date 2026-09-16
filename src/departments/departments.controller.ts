@@ -20,8 +20,8 @@ export class DepartmentsController {
   }
 
   @Get()
-  findAll(@Query('salesId') salesId?: string, @Query('search') search?: string) {
-    return this.departmentsService.findAll({ salesId, search });
+  findAll(@Query('salesId') salesId?: string, @Query('search') search?: string, @Query('active') active?: string) {
+    return this.departmentsService.findAll({ salesId, search, activeOnly: active === 'true' });
   }
 
   @Get(':id')

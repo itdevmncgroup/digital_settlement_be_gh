@@ -12,9 +12,12 @@
 // package - pdf-parse's bundled old pdf.js gets corrupted by exceljs being loaded
 // anywhere in the same process (Import module), throwing "Invalid PDF structure"
 // on perfectly valid PDFs. See pdfjs-text.util.ts for the full story.
-import { recognizeText } from '../common/ocr/recognize-text.util';
+import { Logger } from '@nestjs/common';
+import { recognizePages } from '../common/ocr/recognize-text.util';
 import { extractPdfText } from '../common/pdf/pdfjs-text.util';
 import { renderPdfPagesToImages } from './pdf-to-images.util';
+
+const logger = new Logger('BankStatementParser');
 
 export interface ParsedBankLine {
   lineNo: number;
@@ -97,9 +100,14 @@ function parseTransactionLines(text: string, lineNoOffset = 0): ParsedBankLine[]
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
 
   const results: ParsedBankLine[] = [];
+  let noLeadingDate = 0;
+  let noTrailingAmount = 0;
   lines.forEach((line, idx) => {
     const { date, rest } = parseLeadingDate(line);
-    if (!date) return; // skip headers/footers/non-transaction lines
+    if (!date) {
+      noLeadingDate++; // skip headers/footers/non-transaction lines
+      return;
+    }
 
     // Credit-card statements commonly print two leading dates - Transaction
     // Date then Posting Date (e.g. MNC Bank's "Tanggal Transaksi"/"Tanggal
@@ -109,9 +117,15 @@ function parseTransactionLines(text: string, lineNoOffset = 0): ParsedBankLine[]
     const rest2 = parseLeadingDate(rest).rest;
 
     const amountMatch = rest2.match(TRAILING_AMOUNT);
-    if (!amountMatch) return;
+    if (!amountMatch) {
+      noTrailingAmount++;
+      return;
+    }
     const amount = parseAmount(amountMatch[1]);
-    if (amount === null) return;
+    if (amount === null) {
+      noTrailingAmount++;
+      return;
+    }
 
     const description = rest2.slice(0, rest2.length - amountMatch[0].length).trim();
     const cardMatch = line.match(CARD_LAST4);
@@ -125,6 +139,15 @@ function parseTransactionLines(text: string, lineNoOffset = 0): ParsedBankLine[]
     });
   });
 
+  // noTrailingAmount lines had a recognized leading date but no parseable
+  // trailing amount - unlike noLeadingDate (expected for headers/footers),
+  // that's the signature of a bank layout this parser doesn't fully handle.
+  if (noTrailingAmount > 0) {
+    logger.warn(
+      `Parsed ${results.length}/${lines.length} lines as transactions - ${noTrailingAmount} line(s) had a date but no recognizable amount (possible unsupported statement format), ${noLeadingDate} had no leading date (headers/footers).`,
+    );
+  }
+
   return results;
 }
 
@@ -136,16 +159,19 @@ const MIN_TEXT_LENGTH_FOR_TEXT_LAYER = 200;
 export async function parseBankStatementPdf(buffer: Buffer): Promise<ParsedBankLine[]> {
   const extracted = await extractPdfText(buffer);
   if (extracted.text.trim().length >= MIN_TEXT_LENGTH_FOR_TEXT_LAYER) {
+    logger.log(`Extracted text layer from ${extracted.numPages} page(s), ${extracted.text.length} chars.`);
     return parseTransactionLines(extracted.text);
   }
 
   // No usable text layer - render each page to an image and OCR it instead,
   // same engine as the receipt-photo OCR flow.
+  logger.log(`No usable text layer (${extracted.text.trim().length} chars) - falling back to OCR.`);
   const pageImages = await renderPdfPagesToImages(buffer);
+  const ocrResults = await recognizePages(pageImages);
   const results: ParsedBankLine[] = [];
-  for (const pageImage of pageImages) {
-    const { text } = await recognizeText(pageImage);
+  ocrResults.forEach(({ text, confidence }, i) => {
+    logger.log(`OCR page ${i + 1}/${pageImages.length}: confidence ${confidence.toFixed(1)}, ${text.length} chars.`);
     results.push(...parseTransactionLines(text, results.length));
-  }
+  });
   return results;
 }

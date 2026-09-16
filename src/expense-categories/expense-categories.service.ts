@@ -7,8 +7,8 @@ import { CreateExpenseCategoryDto, UpdateExpenseCategoryDto } from './dto/expens
 export class ExpenseCategoriesService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  findAll() {
-    return this.prisma.expenseCategory.findMany({ orderBy: { name: 'asc' } });
+  findAll(activeOnly?: boolean) {
+    return this.prisma.expenseCategory.findMany({ where: activeOnly ? { isActive: true } : undefined, orderBy: { name: 'asc' } });
   }
 
   async findOne(id: string) {
