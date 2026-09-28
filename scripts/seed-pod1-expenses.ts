@@ -3,7 +3,7 @@
 //
 // Goes through the real ExpensesService.create() (via a Nest application
 // context), not raw Prisma inserts - so each Expense gets exactly the same
-// approval chain (HEAD_POD -> CO-CSO-1 -> CO-CSO-2) a real submission from the
+// approval chain (HEAD_POD -> CO-CSO) a real submission from the
 // app would produce, instead of a hand-rolled approximation that could drift
 // from ApprovalsService's actual resolution logic. Requires an Approval Level
 // already configured for DocumentStage.EXPENSES (Admin > Approval Levels) with
@@ -46,12 +46,11 @@ async function main() {
     );
     if (!sales.unitId) throw new Error(`Sales user ${sales.email} has no unitId - fix master data before seeding.`);
 
-    // 1 Department = 1 credit card (CreditCard.departmentId is unique) - reuse
-    // POD 1's existing card if Admin already set one up, otherwise create one.
-    let creditCard = await prisma.creditCard.findUnique({ where: { departmentId: department.id } });
+    // Reuse POD 1's existing card if Admin already set one up, otherwise create one.
+    let creditCard = await prisma.creditCard.findFirst({ where: { departmentId: department.id } });
     if (!creditCard) {
       creditCard = await prisma.creditCard.create({
-        data: { bank: 'BCA', last4: '1234', cardHolderName: `${department.name} Card`, departmentId: department.id },
+        data: { bank: 'BCA', last4: '1234', userId: sales.id, departmentId: department.id },
       });
       console.log(`Created credit card for ${department.name}: BCA ****1234`);
     }

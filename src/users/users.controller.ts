@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -16,16 +16,14 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // Read access also open to Finance - needed to pick a Sales when creating an
-  // Expense on their behalf (BRD section 5.3).
   @Get()
-  @Roles(RoleName.ADMIN, RoleName.FINANCE)
-  findAll() {
-    return this.usersService.findAll();
+  @Roles(RoleName.ADMIN)
+  findAll(@Query('departmentId') departmentId?: string) {
+    return this.usersService.findAll({ departmentId });
   }
 
   @Get(':id')
-  @Roles(RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.ADMIN)
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }

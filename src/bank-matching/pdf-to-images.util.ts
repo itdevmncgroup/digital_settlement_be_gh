@@ -21,12 +21,15 @@ async function loadPdfToImg(): Promise<PdfToImgModule> {
 // table reliably; 3x renders sharp enough for consistently good OCR results.
 const RENDER_SCALE = 3;
 
-export async function renderPdfPagesToImages(buffer: Buffer): Promise<Buffer[]> {
+// Yields one page at a time rather than returning the whole array: a 3x-scale
+// page render is ~100MB of RSS while it's alive, so collecting every page of a
+// long statement first can exhaust memory and kill the process mid-request
+// (which the frontend proxy sees as an ECONNRESET). Streaming lets each page
+// be OCR'd and released before the next is rendered.
+export async function* streamPdfPagesToImages(buffer: Buffer): AsyncGenerator<Buffer> {
   const { pdf } = await loadPdfToImg();
   const doc = await pdf(buffer, { scale: RENDER_SCALE });
-  const images: Buffer[] = [];
   for await (const page of doc) {
-    images.push(page as Buffer);
+    yield page as Buffer;
   }
-  return images;
 }

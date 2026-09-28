@@ -8,7 +8,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 // Audit Trail read (BRD section 24, 26 -> System > Audit Log)
 @Controller('audit-logs')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.ADMIN, RoleName.FINANCE)
+@Roles(RoleName.ADMIN)
 export class AuditLogsController {
   constructor(private readonly prisma: PrismaService) {}
 

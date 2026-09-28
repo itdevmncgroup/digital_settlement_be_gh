@@ -10,7 +10,7 @@ import { UpdateAuditFindingStatusDto } from './dto/update-finding-status.dto';
 
 @Controller('audit-report')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.MANAGEMENT, RoleName.ADMIN, RoleName.FINANCE)
+@Roles(RoleName.MANAGEMENT, RoleName.ADMIN)
 @RequirePermission('audit-report.read.all', 'audit-report.read.owndept')
 export class AuditReportController {
   constructor(private readonly service: AuditReportService) {}

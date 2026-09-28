@@ -5,7 +5,7 @@ import { AuditService } from '../common/audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { canViewAllRecords, canAccessExpenseOwnedRecord, getActorDepartmentIds } from '../common/rbac/scope.util';
+import { canViewAllRecords, canAccessExpenseOwnedRecord, getActorDepartmentIds, canUploadExpenseFiles } from '../common/rbac/scope.util';
 import { RoleName } from '../common/constants/role-name';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto/expense.dto';
 
@@ -121,34 +121,46 @@ export class ExpensesService {
     // dropped from this default - an explicit ?status=APPROVED still finds any
     // leftover historical row.
     const statusFilter = filter.status === 'ALL' ? undefined : filter.status ? filter.status : ExpenseStatus.SETTLED;
+
+    const and: Prisma.ExpenseWhereInput[] = [];
+    if (filter.fromDate || filter.toDate) {
+      // toDate is a calendar day ("YYYY-MM-DD" -> parsed as that day's UTC
+      // midnight) - `lt` the *next* day instead of `lte` the parsed instant so
+      // the whole day is included even if an expenseDate/createdAt carries a
+      // time-of-day past midnight (e.g. demo/seed data, or any future write
+      // that isn't strictly normalised to midnight).
+      const toDateExclusive = filter.toDate ? new Date(filter.toDate) : undefined;
+      toDateExclusive?.setDate(toDateExclusive.getDate() + 1);
+      and.push({
+        expenseDate: {
+          gte: filter.fromDate ? new Date(filter.fromDate) : undefined,
+          lt: toDateExclusive,
+        },
+      });
+    }
+    if (filter.search) {
+      and.push({
+        OR: [
+          { expenseNo: { contains: filter.search, mode: 'insensitive' } },
+          { purpose: { contains: filter.search, mode: 'insensitive' } },
+          { sales: { name: { contains: filter.search, mode: 'insensitive' } } },
+          { advertiser: { name: { contains: filter.search, mode: 'insensitive' } } },
+          { brand: { name: { contains: filter.search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
     return {
       salesId: filter.salesId,
       status: statusFilter,
       unitId: filter.unitId,
       departmentId: filter.departmentIdIn ? { in: filter.departmentIdIn } : filter.departmentId,
-      expenseDate:
-        filter.fromDate || filter.toDate
-          ? {
-              gte: filter.fromDate ? new Date(filter.fromDate) : undefined,
-              lte: filter.toDate ? new Date(filter.toDate) : undefined,
-            }
-          : undefined,
       // isMatched is the source of truth (also true for a manual match with no
       // billing-statement transaction at all - e.g. e-wallet/personal
       // reimbursement), so filter on it directly rather than the bankTransactions
       // relation, which is empty in that case.
       isMatched: filter.matched === 'MATCHED' ? true : filter.matched === 'UNMATCHED' ? false : undefined,
-      ...(filter.search
-        ? {
-            OR: [
-              { expenseNo: { contains: filter.search, mode: 'insensitive' } },
-              { purpose: { contains: filter.search, mode: 'insensitive' } },
-              { sales: { name: { contains: filter.search, mode: 'insensitive' } } },
-              { advertiser: { name: { contains: filter.search, mode: 'insensitive' } } },
-              { brand: { name: { contains: filter.search, mode: 'insensitive' } } },
-            ],
-          }
-        : {}),
+      ...(and.length > 0 ? { AND: and } : {}),
     };
   }
 
@@ -218,6 +230,11 @@ export class ExpensesService {
     if (!dto.unitId || !dto.advertiserId || !dto.brandId || !dto.activityTypeId) {
       throw new BadRequestException('unitId, advertiserId, brandId and activityTypeId are required');
     }
+    // Payment method can stay empty while still a DRAFT (filled in later), but
+    // is mandatory the moment an Expense enters the approval chain.
+    if (!dto.isDraft && !dto.paymentMethodId) {
+      throw new BadRequestException('paymentMethodId is required');
+    }
     const unitId = dto.unitId;
     const advertiserId = dto.advertiserId;
     const brandId = dto.brandId;
@@ -268,23 +285,54 @@ export class ExpensesService {
       include,
     });
 
-    // Submitting IS creating - the approval chain (HEAD_POD -> CO-CSO-1 ->
-    // CO-CSO-2) starts right away, so a new Expense is never a DRAFT sitting
-    // outside the workflow. Bank matching comes later, once that chain is done
-    // (see BankMatchingService.afterMatchChange).
-    await this.prisma.$transaction((tx) =>
-      this.approvals.enterExpenseApproval(tx, { expenseId: expense.id, amount: expense.amount, departmentId: expense.departmentId }),
-    );
+    // Submitting IS creating by default - the approval chain (HEAD_POD -> CO-CSO)
+    // starts right away, so a new Expense only stays a DRAFT (still editable,
+    // invisible to any approver) when the caller explicitly asks for that via
+    // dto.isDraft. Bank matching comes later, once that chain is done (see
+    // BankMatchingService.afterMatchChange).
+    if (!dto.isDraft) {
+      await this.prisma.$transaction((tx) =>
+        this.approvals.enterExpenseApproval(tx, { expenseId: expense.id, amount: expense.amount, departmentId: expense.departmentId }),
+      );
+    }
 
     await this.audit.log({ userId: actorId, action: 'CREATE', objectType: 'Expense', objectId: expense.id, newValue: expense });
     return this.findOne(expense.id);
   }
 
+  // The one explicit "Submit" action a DRAFT Expense gets - moves it into the
+  // approval chain. Editing a REJECTED Expense re-enters the chain automatically
+  // (see update() below), but a DRAFT never does until this is called.
+  async submitDraft(id: string, actorId: string, actorRoles: string[], actorPermissions: string[] = []) {
+    const before = await this.findOne(id);
+    await this.assertCanEdit(before, actorId, actorRoles, actorPermissions);
+    if (before.status !== ExpenseStatus.DRAFT) {
+      throw new BadRequestException(`Expense in status ${before.status} is not a draft`);
+    }
+    if (!before.paymentMethodId) {
+      throw new BadRequestException('paymentMethodId is required');
+    }
+
+    await this.prisma.$transaction((tx) =>
+      this.approvals.enterExpenseApproval(tx, { expenseId: id, amount: before.amount, departmentId: before.departmentId }),
+    );
+
+    await this.audit.log({ userId: actorId, action: 'SUBMIT', objectType: 'Expense', objectId: id, oldValue: { status: before.status } });
+    return this.findOne(id);
+  }
+
+  // Re-sends the current approval step's email/notification without advancing
+  // the chain - lets the owner (or an override permission holder / ADMIN) nudge
+  // an approver who hasn't acted yet. See ApprovalsService.resendNotification.
+  async resendApprovalEmail(id: string, actorId: string, actorRoles: string[], actorPermissions: string[] = []) {
+    await this.findOne(id);
+    await this.approvals.resendNotification(actorId, actorRoles, actorPermissions, { expenseId: id });
+    return { sent: true };
+  }
+
   async update(id: string, dto: UpdateExpenseDto, actorId: string, actorRoles: string[], actorPermissions: string[] = []) {
     const before = await this.findOne(id);
-    if (before.salesId !== actorId && !(await this.canEditExpense(before, actorId, actorRoles, actorPermissions))) {
-      throw new ForbiddenException('Not owner of this expense');
-    }
+    await this.assertCanEdit(before, actorId, actorRoles, actorPermissions);
     if (LOCKED_STATUSES.includes(before.status)) {
       throw new BadRequestException(`Expense in status ${before.status} cannot be edited`);
     }
@@ -292,6 +340,12 @@ export class ExpensesService {
     const nextStatus = before.status === ExpenseStatus.REJECTED ? ExpenseStatus.REVISION : before.status;
 
     const effectivePaymentMethodId = dto.paymentMethodId ?? before.paymentMethodId;
+    // A REJECTED Expense re-enters the approval chain on this same call (see
+    // nextStatus above) - payment method must be filled by then, even if it
+    // was left empty back when the Expense was still a DRAFT.
+    if (before.status === ExpenseStatus.REJECTED && !effectivePaymentMethodId) {
+      throw new BadRequestException('paymentMethodId is required');
+    }
     const effectivePaymentMethod = effectivePaymentMethodId
       ? await this.prisma.paymentMethod.findUnique({ where: { id: effectivePaymentMethodId } })
       : null;
@@ -381,6 +435,9 @@ export class ExpensesService {
     actorPermissions: string[] = [],
   ) {
     const expense = await this.getEditableExpenseOrThrow(expenseId, actorId, actorRoles, actorPermissions);
+    if (!canUploadExpenseFiles(expense, { userId: actorId, roles: actorRoles, permissions: actorPermissions })) {
+      throw new ForbiddenException('Uploading photos requires edit permission on this expense');
+    }
 
     const stored = await this.storage.save(file.buffer, `photo/${expense.id}`, file.originalname);
 
@@ -408,7 +465,8 @@ export class ExpensesService {
     if (!(await canAccessExpenseOwnedRecord(this.prisma, actor, photo.expense))) {
       throw new ForbiddenException('Not authorized to access this photo');
     }
-    return { path: this.storage.resolvePath(photo.storageKey), fileName: photo.fileName, mimeType: photo.mimeType };
+    const buffer = await this.storage.read(photo.storageKey);
+    return { buffer, fileName: photo.fileName, mimeType: photo.mimeType };
   }
 
   private async getEditableExpenseOrThrow(
@@ -419,9 +477,7 @@ export class ExpensesService {
   ) {
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
     if (!expense) throw new NotFoundException('Expense not found');
-    if (expense.salesId !== actorId && !(await this.canEditExpense(expense, actorId, actorRoles, actorPermissions))) {
-      throw new ForbiddenException('Not owner of this expense');
-    }
+    await this.assertCanEdit(expense, actorId, actorRoles, actorPermissions);
     if (LOCKED_STATUSES.includes(expense.status)) {
       throw new BadRequestException(`Expense in status ${expense.status} cannot be modified`);
     }
@@ -429,17 +485,17 @@ export class ExpensesService {
   }
 
   private isBackOffice(actorRoles: string[]): boolean {
-    return actorRoles.some((r) => r === 'ADMIN' || r === 'FINANCE');
+    return actorRoles.includes('ADMINISTRATOR');
   }
 
   // expense.create.all / expense.create.owndept (Role/Permission master) - lets
-  // a caller outside the route's @Roles(SALES/ADMIN/FINANCE) gate (e.g. a
+  // a caller outside the route's @Roles(SALES/ADMIN) gate (e.g. a
   // HEAD_POD/Management holder wanting to log an Expense on their Department's
   // behalf) reach ExpensesController.create at all; RolesGuard already OR's that
-  // in. .all is unrestricted like ADMIN/FINANCE; .owndept is only checked here
+  // in. .all is unrestricted like ADMIN; .owndept is only checked here
   // because the guard can't see *which* departmentId the request body carries -
   // it must be one of the actor's own (see getManagedDepartmentIds). SALES/
-  // ADMIN/FINANCE (the @Roles gate) stay unrestricted, same as before this
+  // ADMIN (the @Roles gate) stay unrestricted, same as before this
   // permission pair existed.
   private async assertCanCreateForDepartment(actorId: string, actorRoles: string[], actorPermissions: string[], departmentId?: string | null) {
     if (this.isBackOffice(actorRoles) || actorRoles.includes(RoleName.SALES)) return;
@@ -448,6 +504,33 @@ export class ExpensesService {
       const managedDepartmentIds = await this.getManagedDepartmentIds(actorId);
       if (departmentId && managedDepartmentIds.includes(departmentId)) return;
       throw new ForbiddenException('Cannot create an Expense for a Department outside your own');
+    }
+  }
+
+  // Owner edits are unrestricted (until LOCKED_STATUSES) unless the actor holds
+  // expense.edit.own - that permission means "own Expense only, and only until
+  // the first approver has approved it". Non-owners fall through to
+  // canEditExpense (.all / .owndept / back office) as before.
+  private async assertCanEdit(
+    expense: { id: string; salesId: string; departmentId: string | null },
+    actorId: string,
+    actorRoles: string[],
+    actorPermissions: string[],
+  ) {
+    if (expense.salesId === actorId) {
+      const canEditBroadly = this.isBackOffice(actorRoles) || actorPermissions.includes('expense.edit.all');
+      if (actorPermissions.includes('expense.edit.own') && !canEditBroadly) {
+        const approvedCount = await this.prisma.approvalAction.count({
+          where: { approvalRequest: { expenseId: expense.id }, action: 'APPROVE' },
+        });
+        if (approvedCount > 0) {
+          throw new ForbiddenException('Expense can no longer be edited - the first approver has already approved it');
+        }
+      }
+      return;
+    }
+    if (!(await this.canEditExpense(expense, actorId, actorRoles, actorPermissions))) {
+      throw new ForbiddenException('Not owner of this expense');
     }
   }
 

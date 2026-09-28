@@ -74,21 +74,33 @@ export class ExpensesController {
   }
 
   @Post()
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   @RequirePermission('expense.create.all', 'expense.create.owndept')
   create(@Body() dto: CreateExpenseDto, @CurrentUser() actor: AuthUser) {
     return this.service.create(dto, actor.userId, actor.roles, actor.permissions);
   }
 
   @Patch(':id')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
-  @RequirePermission('expense.edit.all')
+  @Roles(RoleName.SALES, RoleName.ADMIN)
+  @RequirePermission('expense.edit.all', 'expense.edit.own')
   update(@Param('id') id: string, @Body() dto: UpdateExpenseDto, @CurrentUser() actor: AuthUser) {
     return this.service.update(id, dto, actor.userId, actor.roles, actor.permissions);
   }
 
+  @Post(':id/submit')
+  @Roles(RoleName.SALES, RoleName.ADMIN)
+  @RequirePermission('expense.edit.all', 'expense.edit.own')
+  submitDraft(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.submitDraft(id, actor.userId, actor.roles, actor.permissions);
+  }
+
+  @Post(':id/resend-approval-email')
+  resendApprovalEmail(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.resendApprovalEmail(id, actor.userId, actor.roles, actor.permissions);
+  }
+
   @Post(':id/photos')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   @RequirePermission('expense.create.all', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -112,6 +124,6 @@ export class ExpensesController {
     const photo = await this.service.getPhotoForDownload(photoId, actor);
     res.setHeader('Content-Disposition', `attachment; filename="${photo.fileName}"`);
     res.setHeader('Content-Type', photo.mimeType);
-    res.sendFile(photo.path);
+    res.send(photo.buffer);
   }
 }

@@ -138,10 +138,11 @@ async function login() {
   return data.accessToken;
 }
 
-async function uploadStatement(token, filePath) {
+async function uploadStatement(token, filePath, departmentId) {
   const buffer = fs.readFileSync(filePath);
   const form = new FormData();
   form.append('file', new Blob([buffer], { type: 'application/pdf' }), path.basename(filePath));
+  form.append('departmentId', departmentId);
   const res = await fetch(`${API_URL}/bank-settlements`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -156,10 +157,15 @@ async function main() {
 
   const expenses = await prisma.expense.findMany({
     where: { settlementId: null, bankTransactions: { none: {} } },
-    select: { id: true, amount: true },
+    select: { id: true, amount: true, departmentId: true },
     take: 20,
   });
   console.log(`Found ${expenses.length} unmatched Expense(s) to seed realistic amounts from.`);
+
+  // Auto Match now scopes matching to one Department per upload (see
+  // bank-matching popup) - fall back to any active Department for a statement
+  // whose slice has no real Expense to read a departmentId off of.
+  const fallbackDepartment = await prisma.department.findFirst({ where: { isActive: true }, select: { id: true } });
 
   const cardLast4Pool = ['0001', '0002', '4113', '7788', '2299'];
   const generated = [];
@@ -168,13 +174,14 @@ async function main() {
     const cardLast4 = cardLast4Pool[(i - 1) % cardLast4Pool.length];
     // Give each statement a slice of the pooled real expenses so amounts aren't reused across files.
     const slice = expenses.splice(0, 3);
+    const departmentId = slice[0]?.departmentId ?? fallbackDepartment?.id;
     const lines = buildLines(cardLast4, slice);
     const title = `Statement ${i} of 5 — Card •••• ${cardLast4} — generated ${new Date().toISOString().slice(0, 10)}`;
     const pdfBytes = await buildPdf(title, cardLast4, lines);
     const fileName = `sample-statement-${i}.pdf`;
     const filePath = path.join(OUT_DIR, fileName);
     fs.writeFileSync(filePath, pdfBytes);
-    generated.push(filePath);
+    generated.push({ filePath, departmentId });
     console.log(`Wrote ${filePath} (10 lines: 8 card + 2 other)`);
   }
 
@@ -188,9 +195,9 @@ async function main() {
     return;
   }
 
-  for (const filePath of generated) {
+  for (const { filePath, departmentId } of generated) {
     try {
-      const batch = await uploadStatement(token, filePath);
+      const batch = await uploadStatement(token, filePath, departmentId);
       console.log(`Uploaded ${path.basename(filePath)} -> batch ${batch.id} (${batch.transactions?.length ?? '?'} lines parsed)`);
     } catch (err) {
       console.error(`Failed to upload ${filePath}:`, err.message);

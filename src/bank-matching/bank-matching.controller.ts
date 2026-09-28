@@ -27,7 +27,7 @@ const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 // uploaded by Finance (BRD AutoMatching menu).
 @Controller('bank-settlements')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.FINANCE, RoleName.ADMIN, RoleName.MANAGEMENT)
+@Roles(RoleName.ADMIN, RoleName.MANAGEMENT)
 export class BankMatchingController {
   constructor(private readonly service: BankMatchingService) {}
 
@@ -41,9 +41,12 @@ export class BankMatchingController {
     return this.service.findBatch(id);
   }
 
-  // Backs the "Matched" picker on the Expense detail page - Finance/Admin
-  // search bank transactions (any batch) to manually link one to an Expense.
+  // Backs the "Matched" picker on the Expense detail page - search itself is
+  // unscoped (a bank transaction line has no department until matched), the
+  // expense.match.owndept restriction only kicks in at the actual match step
+  // (assertMatchOverride), same as the other expense.match.* routes below.
   @Get('transactions/search')
+  @RequirePermission('expense.match.all', 'expense.match.owndept')
   searchTransactions(@Query('search') search?: string, @Query('unmatchedOnly') unmatchedOnly?: string) {
     return this.service.searchTransactions(search, unmatchedOnly === 'true');
   }
@@ -66,9 +69,11 @@ export class BankMatchingController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() actor: AuthUser,
     @Query('force') force?: string,
+    @Body('departmentId') departmentId?: string,
+    @Body('creditCardId') creditCardId?: string,
   ) {
     if (!file) throw new NotFoundException('No file uploaded');
-    return this.service.uploadAndMatch(file, actor.userId, force === 'true');
+    return this.service.uploadAndMatch(file, actor.userId, force === 'true', departmentId, creditCardId || undefined);
   }
 
   // "TIDAK" branch of the web page's already-scanned prompt: re-run matching
@@ -81,13 +86,13 @@ export class BankMatchingController {
   }
 
   @Post('transactions/:id/match')
-  @RequirePermission('expense.match.all', 'expense.match.ownpod')
+  @RequirePermission('expense.match.all', 'expense.match.owndept')
   match(@Param('id') id: string, @Body() dto: ManualMatchDto, @CurrentUser() actor: AuthUser) {
     return this.service.manualMatch(id, dto.expenseId, actor);
   }
 
   @Post('transactions/:id/unmatch')
-  @RequirePermission('expense.match.all', 'expense.match.ownpod')
+  @RequirePermission('expense.match.all', 'expense.match.owndept')
   unmatch(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
     return this.service.unmatch(id, actor);
   }
@@ -96,13 +101,13 @@ export class BankMatchingController {
   // page's "Matched (no statement)" option for spend that never appears on a
   // bank/credit-card statement (e-wallet, personal cash pending reimbursement).
   @Post('expenses/:expenseId/manual-match')
-  @RequirePermission('expense.match.all', 'expense.match.ownpod')
+  @RequirePermission('expense.match.all', 'expense.match.owndept')
   manualMatchExpense(@Param('expenseId') expenseId: string, @CurrentUser() actor: AuthUser) {
     return this.service.manualMatchExpense(expenseId, actor);
   }
 
   @Post('expenses/:expenseId/manual-unmatch')
-  @RequirePermission('expense.match.all', 'expense.match.ownpod')
+  @RequirePermission('expense.match.all', 'expense.match.owndept')
   manualUnmatchExpense(@Param('expenseId') expenseId: string, @CurrentUser() actor: AuthUser) {
     return this.service.manualUnmatchExpense(expenseId, actor);
   }

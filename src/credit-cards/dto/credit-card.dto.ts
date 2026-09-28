@@ -8,18 +8,18 @@ export class CreateCreditCardDto {
   @Length(4, 4)
   last4: string;
 
-  @IsString()
-  cardHolderName: string;
-
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
-  // 1 Department = 1 credit card - a Sales in this Department may only spend
-  // on this card.
+  // 1 Department / 1 User(Position) can each hold more than one card.
   @IsOptional()
   @IsString()
   departmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }
 
 export class UpdateCreditCardDto {
@@ -33,14 +33,14 @@ export class UpdateCreditCardDto {
   last4?: string;
 
   @IsOptional()
-  @IsString()
-  cardHolderName?: string;
-
-  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
   @IsOptional()
   @IsString()
   departmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }

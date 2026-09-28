@@ -35,7 +35,7 @@ function assertEntityType(entityType: string): ImportEntityType {
 // Excel/CSV/PDF Import (BRD section 17, 26 -> Import > Excel/CSV)
 @Controller('import')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.ADMIN, RoleName.FINANCE)
+@Roles(RoleName.ADMIN)
 export class ImportController {
   constructor(private readonly service: ImportService) {}
 

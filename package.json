@@ -10,13 +10,16 @@
     "start:dev": "node node_modules/@nestjs/cli/bin/nest.js start --watch",
     "start:prod": "node dist/main.js",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
-    "prisma:generate": "node node_modules/prisma/build/index.js generate",
-    "prisma:migrate": "node node_modules/prisma/build/index.js migrate dev",
-    "prisma:migrate:deploy": "node node_modules/prisma/build/index.js migrate deploy",
-    "prisma:studio": "node node_modules/prisma/build/index.js studio",
-    "seed": "node -r ts-node/register prisma/seed.ts"
+    "prisma:generate": "node -r ./scripts/resolve-database-url.js node_modules/prisma/build/index.js generate",
+    "prisma:migrate": "node -r ./scripts/resolve-database-url.js node_modules/prisma/build/index.js migrate dev",
+    "prisma:migrate:deploy": "node -r ./scripts/resolve-database-url.js node_modules/prisma/build/index.js migrate deploy",
+    "prisma:studio": "node -r ./scripts/resolve-database-url.js node_modules/prisma/build/index.js studio",
+    "seed": "node -r ./scripts/resolve-database-url.js -r ts-node/register prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@aws-sdk/client-s3": "^3.1138.0",
+    "@aws-sdk/client-textract": "^3.1138.0",
     "@nestjs/common": "^10.4.4",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.4.4",
@@ -31,6 +34,7 @@
     "csv-parse": "^5.5.6",
     "exceljs": "^4.4.0",
     "firebase-admin": "^14.4.0",
+    "googleapis": "^181.0.0",
     "helmet": "^7.1.0",
     "nodemailer": "^9.0.6",
     "passport": "^0.7.0",
@@ -41,7 +45,9 @@
     "rxjs": "^7.8.1",
     "sharp": "^0.35.4",
     "tesseract.js": "^7.0.0",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",

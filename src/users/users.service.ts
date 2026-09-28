@@ -16,8 +16,14 @@ const userInclude = {
 export class UsersService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
 
-  async findAll() {
-    const users = await this.prisma.user.findMany({ include: userInclude, orderBy: { createdAt: 'desc' } });
+  async findAll(filter?: { departmentId?: string }) {
+    const users = await this.prisma.user.findMany({
+      where: filter?.departmentId
+        ? { departments: { some: { departmentId: filter.departmentId, status: 'ACTIVE' } } }
+        : undefined,
+      include: userInclude,
+      orderBy: { createdAt: 'desc' },
+    });
     return users.map(this.toPublic);
   }
 

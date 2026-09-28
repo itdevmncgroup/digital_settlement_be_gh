@@ -188,8 +188,7 @@ async function main() {
     { status: ExpenseStatus.APPROVAL_DEPT_HEAD, count: 3 },
     { status: ExpenseStatus.APPROVAL_DIV_HEAD, count: 3 },
     { status: ExpenseStatus.APPROVAL_BOD, count: 3 },
-    { status: ExpenseStatus.APPROVAL_CO_CSO_1, count: 4 },
-    { status: ExpenseStatus.APPROVAL_CO_CSO_2, count: 4 },
+    { status: ExpenseStatus.APPROVAL_CO_CSO, count: 8 },
     { status: ExpenseStatus.REJECTED, count: 8 },
     { status: ExpenseStatus.REVISION, count: 5 },
   ];
@@ -330,7 +329,7 @@ async function main() {
   for (let i = 0; i < 2; i++) await createSettlementWithChain(pick(activeDepartments), randomAmount(15, 25), 2); // waiting at CO_CFO_3TV
   for (let i = 0; i < 2; i++) await createSettlementWithChain(pick(activeDepartments), randomAmount(15, 40), 'rejected');
 
-  console.log('\nDone. Open /expense-dashboard, /dashboard/settlement and /dashboard/expense-analytics (logged in as ADMIN/FINANCE/MANAGEMENT) to see them populated.');
+  console.log('\nDone. Open /expense-dashboard, /dashboard/settlement and /dashboard/expense-analytics (logged in as ADMINISTRATOR/FINANCE/MANAGEMENT) to see them populated.');
 }
 
 main()

@@ -449,6 +449,44 @@ export class ApprovalsService {
     });
   }
 
+  // Re-sends the current step's approval email/in-app notification without
+  // advancing the chain - a fresh emailToken is issued each time (old ones
+  // aren't reusable across sends), same as any other notifyStep call. Lets the
+  // Expense owner nudge a slow approver; also open to whoever could override
+  // that step's approve/reject (expense.approve.all/owndept, ADMIN), same gate
+  // as approve()/reject() above.
+  async resendNotification(
+    actorId: string,
+    actorRoles: string[] = [],
+    actorPermissions: string[] = [],
+    target: { expenseId?: string; eventId?: string },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const request = await tx.approvalRequest.findFirst({
+        where: target.expenseId ? { expenseId: target.expenseId } : { eventId: target.eventId },
+        include: {
+          steps: { include: { position: true }, orderBy: { stepOrder: 'asc' } },
+          expense: { select: { salesId: true } },
+        },
+      });
+      if (!request) throw new NotFoundException('Approval request not found');
+      if (request.status !== ApprovalStatus.PENDING) {
+        throw new BadRequestException('This document is not currently pending approval');
+      }
+
+      const step = request.steps.find((s) => s.stepOrder === request.currentStep);
+      if (!step) throw new BadRequestException('Approval request has no current step');
+
+      const isOwner = !!target.expenseId && request.expense?.salesId === actorId;
+      if (!isOwner && !actorRoles.includes('ADMINISTRATOR')) {
+        await this.assertApprovalOverride(tx, actorId, target, actorPermissions);
+      }
+
+      await this.notifyStep(tx, { documentStage: request.documentStage, expenseId: target.expenseId, eventId: target.eventId, step });
+      return { sent: true };
+    });
+  }
+
   async getTokenInfo(token: string) {
     const step = await this.prisma.approvalRequestStep.findUnique({
       where: { emailToken: token },
@@ -678,7 +716,7 @@ export class ApprovalsService {
   // Expense.status mirrors whichever approval tier is currently reviewing it - one
   // value per Position.code in today's master data (see prisma/schema.prisma
   // ExpenseStatus enum). Position codes are free text and several carry "-"
-  // (CO-CSO-1), which a Prisma enum value can't, so normalise to "_" first.
+  // (CO-CSO), which a Prisma enum value can't, so normalise to "_" first.
   // Falls back to the generic PENDING_APPROVAL for a Position that doesn't have
   // a matching status yet (e.g. one an Admin just created).
   private pendingStatusForPosition(positionCode: string): ExpenseStatus {
@@ -686,11 +724,10 @@ export class ApprovalsService {
     return key in ExpenseStatus ? (ExpenseStatus as unknown as Record<string, ExpenseStatus>)[key] : ExpenseStatus.PENDING_APPROVAL;
   }
 
-  // Entry point into the Expense approval chain (HEAD_POD -> CO-CSO-1 ->
-  // CO-CSO-2), entered the moment the Expense is created - there is no DRAFT
-  // state outside the workflow and no separate Submit. Also used by
-  // ExpensesService.update() to re-enter the chain when a REJECTED Expense is
-  // edited.
+  // Entry point into the Expense approval chain (HEAD_POD -> CO-CSO). Entered on
+  // Expense creation unless the caller saved it as a DRAFT (see
+  // ExpensesService.create/submitDraft), and again by ExpensesService.update()
+  // to re-enter the chain when a REJECTED Expense is edited.
   async enterExpenseApproval(
     tx: Prisma.TransactionClient,
     params: { expenseId: string; amount: Prisma.Decimal | number; departmentId?: string | null },
@@ -745,7 +782,14 @@ export class ApprovalsService {
   // so both always name the tier currently reviewing the batch.
   private async applyTierStatus(tx: Prisma.TransactionClient, settlementId: string, positionCode: string): Promise<SettlementStatus> {
     const key = `APPROVAL_${positionCode.replace(/-/g, '_')}`;
-    const settlementStatus = key in SettlementStatus ? (SettlementStatus as unknown as Record<string, SettlementStatus>)[key] : SettlementStatus.DRAFT;
+    // No fallback: a Position with no matching status would otherwise park the
+    // whole batch on a meaningless one (DRAFT) with no sign anything went wrong.
+    if (!(key in SettlementStatus)) {
+      throw new BadRequestException(
+        `The Settlement approval level starts at Position "${positionCode}", which has no matching ${key} status - re-chain it through System > Approval Level`,
+      );
+    }
+    const settlementStatus = (SettlementStatus as unknown as Record<string, SettlementStatus>)[key];
     const expenseStatus = this.pendingStatusForPosition(positionCode);
     await tx.settlement.update({ where: { id: settlementId }, data: { status: settlementStatus } });
     await tx.expense.updateMany({ where: { settlementId }, data: { status: expenseStatus } });
@@ -773,7 +817,7 @@ export class ApprovalsService {
       if (request.status !== ApprovalStatus.PENDING) throw new BadRequestException('Approval request is not pending');
       const step = request.steps.find((s) => s.stepOrder === request.currentStep);
       if (!step) throw new BadRequestException('Approval request has no current step');
-      if (step.resolvedApproverId !== actor.userId && !actor.roles.includes('ADMIN')) {
+      if (step.resolvedApproverId !== actor.userId && !actor.roles.includes('ADMINISTRATOR')) {
         throw new ForbiddenException('You are not the assigned approver for this step');
       }
 
@@ -833,7 +877,7 @@ export class ApprovalsService {
       if (request.status !== ApprovalStatus.PENDING) throw new BadRequestException('Approval request is not pending');
       const step = request.steps.find((s) => s.stepOrder === request.currentStep);
       if (!step) throw new BadRequestException('Approval request has no current step');
-      if (step.resolvedApproverId !== actor.userId && !actor.roles.includes('ADMIN')) {
+      if (step.resolvedApproverId !== actor.userId && !actor.roles.includes('ADMINISTRATOR')) {
         throw new ForbiddenException('You are not the assigned approver for this step');
       }
 
@@ -841,7 +885,24 @@ export class ApprovalsService {
         where: { settlementId },
         select: { id: true, expenseNo: true, settlementApprovedStep: true },
       });
-      if (expenses.length === 0) throw new BadRequestException('This settlement has no expenses left to submit');
+
+      // Every member Expense was rejected out of the batch (rejectSettlementExpense
+      // clears settlementId) - nothing is left to carry into the next tier, so close
+      // the settlement here instead of erroring or advancing a chain with no members.
+      if (expenses.length === 0) {
+        await tx.approvalRequestStep.update({ where: { id: step.id }, data: { status: ApprovalStepStatus.REJECTED } });
+        await tx.approvalRequest.update({ where: { id: request.id }, data: { status: ApprovalStatus.REJECTED } });
+        await tx.settlement.update({ where: { id: settlementId }, data: { status: SettlementStatus.REJECTED } });
+        await this.audit.log({
+          userId: actor.userId,
+          action: 'SUBMIT',
+          objectType: 'Settlement',
+          objectId: settlementId,
+          newValue: { tier: request.currentStep, position: step.positionId, allExpensesRejected: true },
+        });
+        return { isFinalStep: false };
+      }
+
       const unreviewed = expenses.filter((e) => (e.settlementApprovedStep ?? -1) < request.currentStep);
       if (unreviewed.length > 0) {
         throw new BadRequestException(`Approve or reject every expense first - still pending: ${unreviewed.map((e) => e.expenseNo).join(', ')}`);
@@ -914,7 +975,7 @@ export class ApprovalsService {
       const step = request.steps.find((s) => s.stepOrder === request.currentStep);
       if (!step) throw new BadRequestException('Approval request has no current step');
       // Admin override: acts as any approver on any step, for oversight/unblocking.
-      if (step.resolvedApproverId !== actorId && !actorRoles.includes('ADMIN')) {
+      if (step.resolvedApproverId !== actorId && !actorRoles.includes('ADMINISTRATOR')) {
         await this.assertApprovalOverride(tx, actorId, target, actorPermissions);
       }
 
@@ -986,7 +1047,7 @@ export class ApprovalsService {
       const step = request.steps.find((s) => s.stepOrder === request.currentStep);
       if (!step) throw new BadRequestException('Approval request has no current step');
       // Admin override: acts as any approver on any step, for oversight/unblocking.
-      if (step.resolvedApproverId !== actorId && !actorRoles.includes('ADMIN')) {
+      if (step.resolvedApproverId !== actorId && !actorRoles.includes('ADMINISTRATOR')) {
         await this.assertApprovalOverride(tx, actorId, target, actorPermissions);
       }
 

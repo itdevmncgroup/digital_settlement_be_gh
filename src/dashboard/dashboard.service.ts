@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ExpenseStatus, SettlementStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApprovalsService } from '../approvals/approvals.service';
@@ -54,8 +54,9 @@ const PENDING_APPROVAL_STATUSES: ExpenseStatus[] = [
   ExpenseStatus.APPROVAL_DEPT_HEAD,
   ExpenseStatus.APPROVAL_DIV_HEAD,
   ExpenseStatus.APPROVAL_BOD,
-  ExpenseStatus.APPROVAL_CO_CSO_1,
-  ExpenseStatus.APPROVAL_CO_CSO_2,
+  ExpenseStatus.APPROVAL_CO_CSO,
+  ExpenseStatus.APPROVAL_CO_CSO_1, // legacy, pre-merge rows only
+  ExpenseStatus.APPROVAL_CO_CSO_2, // legacy, pre-merge rows only
   ExpenseStatus.APPROVAL_SLS_MAR_DIR,
   ExpenseStatus.APPROVAL_VP_ACC_BIL_TAX_3TV,
   ExpenseStatus.APPROVAL_CO_CFO_3TV,
@@ -81,11 +82,40 @@ const PENDING_REVIEW_STATUSES: ExpenseStatus[] = [
   ExpenseStatus.APPROVAL_DEPT_HEAD,
   ExpenseStatus.APPROVAL_DIV_HEAD,
   ExpenseStatus.APPROVAL_BOD,
-  ExpenseStatus.APPROVAL_CO_CSO_1,
-  ExpenseStatus.APPROVAL_CO_CSO_2,
+  ExpenseStatus.APPROVAL_CO_CSO,
+  ExpenseStatus.APPROVAL_CO_CSO_1, // legacy, pre-merge rows only
+  ExpenseStatus.APPROVAL_CO_CSO_2, // legacy, pre-merge rows only
   ExpenseStatus.APPROVAL_SLS_MAR_DIR,
   ExpenseStatus.APPROVAL_VP_ACC_BIL_TAX_3TV,
   ExpenseStatus.APPROVAL_CO_CFO_3TV,
+];
+
+// Sales dashboard buckets. Pending = still inside the Expense chain
+// (HEAD_POD -> CO-CSO); fully approved = cleared CSO, i.e. everything from
+// READY_TO_MATCHING onward (matching / settlement / complete, plus legacy
+// APPROVED/SETTLED).
+const SALES_PENDING_STATUSES: ExpenseStatus[] = [
+  ExpenseStatus.SUBMITTED,
+  ExpenseStatus.PENDING_APPROVAL,
+  ExpenseStatus.APPROVAL_HEAD_POD,
+  ExpenseStatus.APPROVAL_KOORDINATOR,
+  ExpenseStatus.APPROVAL_SUPERVISOR,
+  ExpenseStatus.APPROVAL_DEPT_HEAD,
+  ExpenseStatus.APPROVAL_DIV_HEAD,
+  ExpenseStatus.APPROVAL_BOD,
+  ExpenseStatus.APPROVAL_CO_CSO,
+  ExpenseStatus.APPROVAL_CO_CSO_1, // legacy, pre-merge rows only
+  ExpenseStatus.APPROVAL_CO_CSO_2, // legacy, pre-merge rows only
+];
+const SALES_FULLY_APPROVED_STATUSES: ExpenseStatus[] = [
+  ExpenseStatus.READY_TO_MATCHING,
+  ExpenseStatus.READY_TO_SETTLED,
+  ExpenseStatus.APPROVAL_SLS_MAR_DIR,
+  ExpenseStatus.APPROVAL_VP_ACC_BIL_TAX_3TV,
+  ExpenseStatus.APPROVAL_CO_CFO_3TV,
+  ExpenseStatus.COMPLETE,
+  ExpenseStatus.SETTLED,
+  ExpenseStatus.APPROVED,
 ];
 
 // Statuses shown as "Review Expense" in the recent-activity feed - still with
@@ -117,6 +147,135 @@ export class DashboardService {
   // resolveApprover's ANY branch). "Total expense" here always means
   // SETTLED-only (money actually fully approved), not every in-flight status
   // like summary()'s unfiltered totalExpense.
+  // Only the caller's own Expenses (salesId = actor), never department-scoped.
+  async getSalesDashboard(actor: AuthUser) {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const own = { salesId: actor.userId };
+    const [month, pending, fullyApproved, needsRevisionCount, recent] = await Promise.all([
+      this.prisma.expense.aggregate({
+        where: { ...own, createdAt: { gte: monthStart, lt: nextMonthStart } },
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { ...own, status: { in: SALES_PENDING_STATUSES } },
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { ...own, status: { in: SALES_FULLY_APPROVED_STATUSES } },
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.count({ where: { ...own, status: { in: [ExpenseStatus.REJECTED, ExpenseStatus.REVISION] } } }),
+      this.prisma.expense.findMany({
+        where: own,
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          expenseNo: true,
+          amount: true,
+          status: true,
+          expenseDate: true,
+          createdAt: true,
+          salesId: true,
+          advertiser: { select: { name: true } },
+          brand: { select: { name: true } },
+        },
+      }),
+    ]);
+    return {
+      month: { from: monthStart, to: nextMonthStart, count: month._count._all, totalAmount: month._sum.amount ?? 0 },
+      pending: { count: pending._count._all, totalAmount: pending._sum.amount ?? 0 },
+      fullyApproved: { count: fullyApproved._count._all, totalAmount: fullyApproved._sum.amount ?? 0 },
+      needsRevisionCount,
+      recent,
+    };
+  }
+
+  // Head POD's own-pod dashboard: expenses in the Department(s) they are the
+  // active HEAD_POD approver for. "Not complete" = still moving through the
+  // approval/matching/settlement chains, so DRAFT (never submitted) and
+  // REJECTED (dead) are left out; "complete" = the Settlement chain finished.
+  getHeadPodDashboard(actor: AuthUser) {
+    return this.getDepartmentApproverDashboard(actor, { equals: 'HEAD_POD' }, 'Head POD');
+  }
+
+  // Same shape for CO-CSO (single merged tier), who can cover many Departments
+  // (one DepartmentPositionAssignment each).
+  getCoCsoDashboard(actor: AuthUser) {
+    return this.getDepartmentApproverDashboard(actor, { in: ['CO-CSO', 'CO_CSO'] }, 'CO-CSO');
+  }
+
+  // Management (any Position - DEPT_HEAD/DIV_HEAD/BOD/...): the Departments
+  // they belong to or approve for; dashboard.read.all widens that to everything.
+  async getManagementDashboard(actor: AuthUser) {
+    if (!(actor.roles ?? []).includes(RoleName.MANAGEMENT)) throw new ForbiddenException('Not a Management user');
+    if (actor.permissions?.includes('dashboard.read.all')) {
+      return this.buildDepartmentDashboard(actor, undefined, []);
+    }
+    const ids = await getActorDepartmentIds(this.prisma, actor.userId);
+    const departments = await this.prisma.department.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    return this.buildDepartmentDashboard(actor, ids, departments);
+  }
+
+  private async getDepartmentApproverDashboard(
+    actor: AuthUser,
+    code: { equals: string } | { in: string[] },
+    label: string,
+  ) {
+    const assignments = await this.prisma.departmentPositionAssignment.findMany({
+      where: { userId: actor.userId, position: { code }, status: 'ACTIVE' },
+      include: { department: { select: { id: true, name: true } } },
+    });
+    if (assignments.length === 0) throw new ForbiddenException(`Not an active ${label}`);
+    return this.buildDepartmentDashboard(
+      actor,
+      assignments.map((a) => a.departmentId),
+      assignments.map((a) => a.department),
+    );
+  }
+
+  // departmentIds undefined = every Department.
+  private async buildDepartmentDashboard(
+    actor: AuthUser,
+    departmentIds: string[] | undefined,
+    departments: { id: string; name: string }[],
+  ) {
+    const departmentId = departmentIds ? { in: departmentIds } : undefined;
+
+    const [inProgress, complete, pending] = await Promise.all([
+      this.prisma.expense.aggregate({
+        where: { departmentId, status: { notIn: [ExpenseStatus.COMPLETE, ExpenseStatus.DRAFT, ExpenseStatus.REJECTED] } },
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { departmentId, status: ExpenseStatus.COMPLETE },
+        _count: { _all: true },
+        _sum: { amount: true },
+      }),
+      this.approvals.findPendingFor(actor.userId, actor.permissions),
+    ]);
+
+    return {
+      pods: departments,
+      departments,
+      allDepartments: !departmentIds,
+      notComplete: { count: inProgress._count._all, totalAmount: inProgress._sum.amount ?? 0 },
+      complete: { count: complete._count._all, totalAmount: complete._sum.amount ?? 0 },
+      // Only what is actionable right now (BOD-style lookahead rows excluded).
+      pendingApprovalCount: pending.filter((p) => p.isMyTurn).length,
+    };
+  }
+
   async getMyDashboard(actor: AuthUser) {
     const user = await this.prisma.user.findUnique({
       where: { id: actor.userId },

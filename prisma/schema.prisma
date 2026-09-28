@@ -25,8 +25,6 @@ datasource db {
 // to it, so it grants no extra access until a developer adds one.
 enum RoleName {
   SALES
-  SUPERVISOR
-  FINANCE
   ADMIN
   MANAGEMENT
 }
@@ -68,6 +66,7 @@ model User {
   auditFindingsResolved   AuditFinding[]                 @relation("AuditFindingResolvedBy")
   notifications           Notification[]
   deviceTokens            DeviceToken[]
+  creditCards             CreditCard[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -140,8 +139,9 @@ model Department {
   settlements    Settlement[]
   assignments    DepartmentAssignment[]
   approvers      DepartmentPositionAssignment[]
-  creditCard     CreditCard?
+  creditCards    CreditCard[]
   auditFindings  AuditFinding[]
+  bankSettlementBatches BankSettlementBatch[]
   createdAt      DateTime                       @default(now())
   updatedAt      DateTime                       @updatedAt
 
@@ -203,13 +203,18 @@ model Unit {
   code         String               @unique
   name         String
   isActive     Boolean              @default(true)
-  users        User[]
-  assignments  SalesAssignment[]
-  events       Event[]
-  expenses     Expense[]
-  participants ExpenseParticipant[]
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  // Default Settlement allocation split for this Unit (e.g. RCTI 48 / MNCTV 43 /
+  // GTV 14) - only a starting value, each SettlementAllocation row still stores
+  // its own percentage and can override it.
+  revenueSharePercent   Decimal?                @db.Decimal(5, 2)
+  users                 User[]
+  assignments           SalesAssignment[]
+  events                Event[]
+  expenses              Expense[]
+  participants          ExpenseParticipant[]
+  settlementAllocations SettlementAllocation[]
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
 
   @@map("units")
 }
@@ -274,17 +279,22 @@ model Brand {
 // 1 Department = 1 credit card: a Sales in a given Department may only spend
 // on that Department's own card. departmentId is unique so a card can't be
 // assigned to more than one Department.
+// 1 Department can hold many cards; 1 User (and thus 1 Position, via
+// User.positionId) can likewise hold more than one card - no uniqueness on
+// either FK.
 model CreditCard {
-  id             String      @id @default(uuid())
-  bank           String
-  last4          String
-  cardHolderName String
-  isActive       Boolean     @default(true)
-  departmentId   String?     @unique
-  department     Department? @relation(fields: [departmentId], references: [id])
-  expenses       Expense[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id           String      @id @default(uuid())
+  bank         String
+  last4        String
+  isActive     Boolean     @default(true)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  userId       String?
+  user         User?       @relation(fields: [userId], references: [id])
+  expenses     Expense[]
+  bankSettlementBatches BankSettlementBatch[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@map("credit_cards")
 }
@@ -472,8 +482,11 @@ enum ExpenseStatus {
   APPROVAL_DEPT_HEAD
   APPROVAL_DIV_HEAD
   APPROVAL_BOD
-  // Position codes carrying "-" (CO-CSO-1) are normalised to "_" before the
+  // Position codes carrying "-" (CO-CSO) are normalised to "_" before the
   // APPROVAL_<code> lookup - see ApprovalsService.pendingStatusForPosition.
+  APPROVAL_CO_CSO
+  // CO-CSO-1/CO-CSO-2 merged into the single CO-CSO tier above - kept only for
+  // historical rows still carrying the old two-step chain.
   APPROVAL_CO_CSO_1
   APPROVAL_CO_CSO_2
   // DocumentStage.SETTLEMENT tier - the same Expense continues into this second
@@ -487,8 +500,8 @@ enum ExpenseStatus {
   APPROVED
   REJECTED
   REVISION
-  // Terminal of the DocumentStage.EXPENSES chain (HEAD_POD -> CO-CSO-1 ->
-  // CO-CSO-2): approved, now waiting for Sales Admin to bank-match it.
+  // Terminal of the DocumentStage.EXPENSES chain (HEAD_POD -> CO-CSO): approved,
+  // now waiting for Sales Admin to bank-match it.
   READY_TO_MATCHING
   // Bank-matched - waiting to be grouped into a Settlement.
   READY_TO_SETTLED
@@ -931,6 +944,15 @@ model BankSettlementBatch {
   contentHash  String?           @unique
   uploadedById String
   uploadedBy   User              @relation("BatchUploadedBy", fields: [uploadedById], references: [id])
+  // Which Department/Corporate Card this statement file is for - informational
+  // (matches the Department picked in the Auto Match popup, not derived from
+  // the PDF itself), and also scopes matching: uploadAndMatch()/rematch() only
+  // score this batch's lines against Expenses in departmentId, since the same
+  // amount/date can legitimately appear on two different cards in one dept.
+  departmentId String?
+  department   Department?       @relation(fields: [departmentId], references: [id])
+  creditCardId String?
+  creditCard   CreditCard?       @relation(fields: [creditCardId], references: [id])
   transactions BankTransaction[]
   createdAt    DateTime          @default(now())
 
@@ -974,6 +996,7 @@ model Settlement {
   createdBy        User             @relation("SettlementCreatedBy", fields: [createdById], references: [id])
   expenses         Expense[]
   approvalRequest  ApprovalRequest?
+  allocations      SettlementAllocation[]
   // Set once the Settlement's final tier is submitted and the batch has been
   // pushed to the external system - the guard that keeps ExternalSyncService
   // from sending the same Settlement twice.
@@ -986,6 +1009,12 @@ model Settlement {
 
 enum SettlementStatus {
   DRAFT
+  // Set when the Settlement is first created (create()/createFromSelection()) -
+  // the allocation rows entered in the Create Settlement popup are saved here,
+  // but the approval chain has not started yet. Only advances to
+  // APPROVAL_SLS_MAR_DIR once the user presses the settlement list's own
+  // "Submit" action (SettlementsService.submitDraft).
+  DRAFT_SETTLEMENT
   // Mirrors whichever tier of the Settlement's own approval chain is reviewing
   // the batch right now - the member Expenses carry the matching
   // ExpenseStatus.APPROVAL_* value, and both advance together when that tier's
@@ -995,6 +1024,35 @@ enum SettlementStatus {
   APPROVAL_CO_CFO_3TV
   COMPLETE
   REJECTED
+}
+
+// One revenue-split / ERP journal line entered in the Create Settlement popup
+// (BRD: Unit + Persentase + Analytic Acc/Account/Wilayah/Line PR/... columns
+// below the picked Expenses, added dynamically row by row). Original Price,
+// Unit Price and Total Price are always server-computed as
+// (sum of the Settlement's Expense amounts) * percentage / 100 - never trusted
+// from the client - see SettlementsService.buildAllocationRow.
+model SettlementAllocation {
+  id            String     @id @default(uuid())
+  settlementId  String
+  settlement    Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  unitId        String
+  unit          Unit       @relation(fields: [unitId], references: [id])
+  percentage    Decimal    @db.Decimal(5, 2)
+  description   String?
+  analyticAcc   String?
+  account       String?
+  wilayah       String?
+  linePr        String?
+  qty           Decimal    @default(1) @db.Decimal(18, 2)
+  curr          String     @default("IDR")
+  originalPrice Decimal    @db.Decimal(18, 2)
+  rate          Decimal    @default(1) @db.Decimal(18, 4)
+  unitPrice     Decimal    @db.Decimal(18, 2)
+  totalPrice    Decimal    @db.Decimal(18, 2)
+  createdAt     DateTime   @default(now())
+
+  @@map("settlement_allocations")
 }
 
 // ---------------------------------------------------------------------------

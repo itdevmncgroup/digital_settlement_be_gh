@@ -23,13 +23,13 @@ export class MerchantsController {
   }
 
   @Post()
-  @Roles(RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.ADMIN)
   create(@Body() dto: CreateMerchantDto, @CurrentUser() actor: AuthUser) {
     return this.service.create(dto, actor.userId);
   }
 
   @Patch(':id')
-  @Roles(RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateMerchantDto, @CurrentUser() actor: AuthUser) {
     return this.service.update(id, dto, actor.userId);
   }

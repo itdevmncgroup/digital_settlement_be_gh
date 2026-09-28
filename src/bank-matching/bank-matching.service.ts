@@ -25,7 +25,17 @@ const AUTO_MATCH_THRESHOLD = 80;
 const REVIEW_THRESHOLD = 40;
 const AUTO_MATCH_MARGIN = 10; // best candidate must lead the runner-up by this much
 
-const batchInclude = { uploadedBy: { select: { id: true, name: true } } } as const;
+// A statement can carry hundreds of lines, each written row-by-row (plus an
+// expense status refresh per auto-match) inside one transaction - well past
+// Prisma's 5s interactive-transaction default, which aborts mid-scan with
+// P2028 and surfaces as a 500.
+const MATCH_TX_OPTIONS = { timeout: 120_000, maxWait: 15_000 } as const;
+
+const batchInclude = {
+  uploadedBy: { select: { id: true, name: true } },
+  department: { select: { id: true, name: true } },
+  creditCard: { select: { id: true, bank: true, last4: true } },
+} as const;
 const txnInclude = {
   matchedExpense: {
     select: {
@@ -99,7 +109,15 @@ export class BankMatchingService {
   // existing batch (already scanned - no reparsing) unless `force` is set, in
   // which case that same batch's transactions are wiped and rebuilt from
   // scratch (an explicit "scan ulang").
-  async uploadAndMatch(file: Express.Multer.File, actorId: string, force = false) {
+  async uploadAndMatch(
+    file: Express.Multer.File,
+    actorId: string,
+    force = false,
+    departmentId?: string,
+    creditCardId?: string,
+  ) {
+    if (!departmentId) throw new BadRequestException('Department is required');
+
     const contentHash = createHash('sha256').update(file.buffer).digest('hex');
     const existing = await this.prisma.bankSettlementBatch.findUnique({ where: { contentHash } });
 
@@ -126,7 +144,7 @@ export class BankMatchingService {
       );
     }
 
-    const candidates = await this.loadCandidates();
+    const candidates = await this.loadCandidates(departmentId);
     const counts = { autoMatched: 0, reviewRequired: 0, unmatched: 0 };
 
     let batch;
@@ -135,10 +153,17 @@ export class BankMatchingService {
         const b = existing
           ? await tx.bankSettlementBatch.update({
               where: { id: existing.id },
-              data: { fileName: file.originalname, storageKey: stored.storageKey, uploadedById: actorId },
+              data: { fileName: file.originalname, storageKey: stored.storageKey, uploadedById: actorId, departmentId, creditCardId },
             })
           : await tx.bankSettlementBatch.create({
-              data: { fileName: file.originalname, storageKey: stored.storageKey, uploadedById: actorId, contentHash },
+              data: {
+                fileName: file.originalname,
+                storageKey: stored.storageKey,
+                uploadedById: actorId,
+                contentHash,
+                departmentId,
+                creditCardId,
+              },
             });
 
         if (existing) {
@@ -171,7 +196,7 @@ export class BankMatchingService {
         }
 
         return b;
-      });
+      }, MATCH_TX_OPTIONS);
     } catch (err) {
       this.logger.error(
         `Auto-match transaction failed for "${file.originalname}" (actor ${actorId}, ${lines.length} parsed lines): ${(err as Error).message}`,
@@ -211,7 +236,7 @@ export class BankMatchingService {
   // and is left alone, same as uploadAndMatch never touching it either.
   async rematch(batchId: string, actorId: string) {
     const batch = await this.findBatch(batchId);
-    const candidates = await this.loadCandidates();
+    const baseCandidates = await this.loadCandidates(batch.departmentId ?? undefined);
     const counts = { autoMatched: 0, reviewRequired: 0, unmatched: 0 };
 
     try {
@@ -220,6 +245,17 @@ export class BankMatchingService {
           if (txn.status === BankTxnStatus.MANUAL_MATCHED) continue;
 
           const previousExpenseId = txn.matchedExpense?.id ?? null;
+          // loadCandidates() only returns unmatched Expenses, but a txn already
+          // AUTO_MATCHED/REVIEW_REQUIRED is linked to an Expense that's now
+          // isMatched=true (READY_TO_SETTLED) precisely because of this txn -
+          // it would otherwise wrongly exclude itself from its own rescore,
+          // scoring as UNMATCHED and knocking the Expense back a step.
+          let candidates = baseCandidates;
+          if (previousExpenseId && !candidates.some((c) => c.id === previousExpenseId)) {
+            const own = await this.loadCandidateById(previousExpenseId);
+            if (own) candidates = [...candidates, own];
+          }
+
           const { expenseId, score, status } = this.bestMatch(
             { amount: Number(txn.amount), transactionDate: txn.transactionDate, rawDescription: txn.rawDescription },
             candidates,
@@ -244,7 +280,7 @@ export class BankMatchingService {
             await this.afterMatchChange(tx, previousExpenseId);
           }
         }
-      });
+      }, MATCH_TX_OPTIONS);
     } catch (err) {
       this.logger.error(
         `Rematch transaction failed for batch ${batchId} (actor ${actorId}): ${(err as Error).message}`,
@@ -272,6 +308,11 @@ export class BankMatchingService {
     const txn = await this.getTxnOrThrow(transactionId);
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
     if (!expense) throw new NotFoundException('Expense not found');
+    // Same gate as loadCandidates() for automatch - an Expense still mid-approval,
+    // rejected, or already past matching must not be manually matchable either.
+    if (expense.status !== ExpenseStatus.READY_TO_MATCHING) {
+      throw new BadRequestException('This expense has not cleared its approval chain yet - it cannot be matched');
+    }
     await this.assertMatchOverride(actor, expenseId);
 
     const updated = await this.prisma.bankTransaction.update({
@@ -342,6 +383,12 @@ export class BankMatchingService {
   async manualMatchExpense(expenseId: string, actor: AuthUser) {
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
     if (!expense) throw new NotFoundException('Expense not found');
+    // Same gate as loadCandidates() for automatch / manualMatch above - an
+    // Expense still mid-approval, rejected, or already past matching must not
+    // be manually matchable either.
+    if (expense.status !== ExpenseStatus.READY_TO_MATCHING) {
+      throw new BadRequestException('This expense has not cleared its approval chain yet - it cannot be matched');
+    }
     await this.assertMatchOverride(actor, expenseId);
 
     const linkedTxn = await this.getLinkedMatchedTxn(expenseId);
@@ -400,18 +447,18 @@ export class BankMatchingService {
   }
 
   // Mirrors approvals.service's assertApprovalOverride: expense.match.all opens
-  // every Expense, expense.match.ownpod only ones in the actor's own
+  // every Expense, expense.match.owndept only ones in the actor's own
   // Department(s) (UserDepartment or an active DepartmentPositionAssignment -
-  // "POD" pre-merge_pod_into_department terminology). ADMIN/FINANCE/MANAGEMENT
+  // "POD" pre-merge_pod_into_department terminology). ADMIN/MANAGEMENT
   // keep the unrestricted access the controller's class-level @Roles already
   // implied before these permissions existed. A txn with no matchedExpenseId
   // (unmatch on an already-unmatched line) has nothing to scope against, so
   // only the unrestricted grants apply.
   private async assertMatchOverride(actor: AuthUser, expenseId: string | null): Promise<void> {
-    const unrestrictedRoles: string[] = [RoleName.ADMIN, RoleName.FINANCE, RoleName.MANAGEMENT];
+    const unrestrictedRoles: string[] = [RoleName.ADMIN, RoleName.MANAGEMENT];
     if (actor.roles.some((r) => unrestrictedRoles.includes(r))) return;
     if (actor.permissions?.includes('expense.match.all')) return;
-    if (expenseId && actor.permissions?.includes('expense.match.ownpod')) {
+    if (expenseId && actor.permissions?.includes('expense.match.owndept')) {
       const expense = await this.prisma.expense.findUnique({ where: { id: expenseId }, select: { departmentId: true } });
       if (expense?.departmentId) {
         const ownDepartmentIds = await getActorDepartmentIds(this.prisma, actor.userId);
@@ -442,8 +489,8 @@ export class BankMatchingService {
   }
 
   // Matching happens after the Expense chain, not before it: an Expense arrives
-  // here already READY_TO_MATCHING (HEAD_POD -> CO-CSO-1 -> CO-CSO-2 all
-  // approved), and matching is what makes it READY_TO_SETTLED, i.e. eligible to
+  // here already READY_TO_MATCHING (HEAD_POD -> CO-CSO all approved), and
+  // matching is what makes it READY_TO_SETTLED, i.e. eligible to
   // be grouped into a Settlement. Unmatching walks that single step back. Every
   // other status is left alone - an Expense still mid-approval, rejected, or
   // already in a Settlement must not be moved by a match toggle.
@@ -458,11 +505,15 @@ export class BankMatchingService {
     }
   }
 
-  private async loadCandidates(): Promise<Candidate[]> {
+  // departmentId scopes candidates to the batch's own Department - a statement
+  // upload is tagged with the Department it came from (Auto Match popup), and
+  // two different Corporate Cards in the same Department can legitimately show
+  // the same amount/date, so cross-department matches would just be wrong.
+  private async loadCandidates(departmentId?: string): Promise<Candidate[]> {
     const expenses = await this.prisma.expense.findMany({
       // Only Expenses that have cleared their approval chain are matchable -
       // matching is the step right after it (READY_TO_MATCHING -> READY_TO_SETTLED).
-      where: { isMatched: false, status: ExpenseStatus.READY_TO_MATCHING },
+      where: { isMatched: false, status: ExpenseStatus.READY_TO_MATCHING, departmentId },
       select: {
         id: true,
         amount: true,
@@ -480,6 +531,32 @@ export class BankMatchingService {
       advertiserName: e.advertiser.name,
       brandName: e.brand.name,
     }));
+  }
+
+  // Same shape as loadCandidates() but for a single Expense regardless of its
+  // isMatched/status - used to add a bank txn's own currently-matched Expense
+  // back into its candidate pool during rematch (see rematch() above).
+  private async loadCandidateById(expenseId: string): Promise<Candidate | null> {
+    const e = await this.prisma.expense.findUnique({
+      where: { id: expenseId },
+      select: {
+        id: true,
+        amount: true,
+        expenseDate: true,
+        sales: { select: { name: true } },
+        advertiser: { select: { name: true } },
+        brand: { select: { name: true } },
+      },
+    });
+    if (!e) return null;
+    return {
+      id: e.id,
+      amount: Number(e.amount),
+      expenseDate: e.expenseDate,
+      salesName: e.sales.name,
+      advertiserName: e.advertiser.name,
+      brandName: e.brand.name,
+    };
   }
 
   private bestMatch(

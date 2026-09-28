@@ -1,8 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DocumentStage, EventStatus } from '@prisma/client';
+import { EventStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
-import { ApprovalsService } from '../approvals/approvals.service';
 import { CreateEventDto, UpdateEventDto } from './dto/event.dto';
 
 const include = {
@@ -26,7 +25,6 @@ export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly approvals: ApprovalsService,
   ) {}
 
   async findAll(filter: { salesId?: string; status?: EventStatus; search?: string }) {
@@ -128,46 +126,35 @@ export class EventsService {
       departmentId = dto.departmentId ?? (await this.resolveDefaultDepartmentId(sales.id));
     }
 
-    const event = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.event.update({
-        where: { id },
-        data: {
-          salesId,
-          unitId,
-          departmentId: dto.departmentId ?? departmentId,
-          advertiserId: dto.advertiserId,
-          brandId: dto.brandId,
-          activityTypeId: dto.activityTypeId,
-          date: dto.date ? new Date(dto.date) : undefined,
-          startTime: dto.startTime,
-          endTime: dto.endTime,
-          location: dto.location,
-          purpose: dto.purpose,
-          estimatedAmount: dto.estimatedAmount,
-          notes: dto.notes,
-        },
-        include,
-      });
-
-      // The approval chain was resolved against the old Department/amount - if
-      // the event is already SUBMITTED, re-resolve it against the edited
-      // values so it doesn't keep pointing at stale approvers.
-      if (before.status === EventStatus.SUBMITTED) {
-        await this.approvals.createOrResetRequest(tx, {
-          documentStage: DocumentStage.PRE_EVENT,
-          eventId: id,
-          amount: updated.estimatedAmount,
-          departmentId: updated.departmentId,
-        });
-        return tx.event.findUniqueOrThrow({ where: { id }, include });
-      }
-      return updated;
+    const event = await this.prisma.event.update({
+      where: { id },
+      data: {
+        salesId,
+        unitId,
+        departmentId: dto.departmentId ?? departmentId,
+        advertiserId: dto.advertiserId,
+        brandId: dto.brandId,
+        activityTypeId: dto.activityTypeId,
+        date: dto.date ? new Date(dto.date) : undefined,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        location: dto.location,
+        purpose: dto.purpose,
+        estimatedAmount: dto.estimatedAmount,
+        notes: dto.notes,
+      },
+      include,
     });
 
     await this.audit.log({ userId: actorId, action: 'UPDATE', objectType: 'Event', objectId: id, oldValue: before, newValue: event });
     return event;
   }
 
+  // Pre-Event approval is retired - no PRE_EVENT ApprovalLevel is configured any
+  // more (see CLAUDE.md: DocumentStage's PRE_EVENT is legacy), so Submit goes
+  // straight to APPROVED instead of opening an approval chain that would never
+  // resolve. EventStatus.SUBMITTED/REJECTED and the PRE_EVENT approve/reject
+  // routes on ApprovalsController stay for old rows created before the retirement.
   async submit(id: string, actorId: string, actorRoles: string[]) {
     const before = await this.findOne(id);
     if (before.salesId !== actorId && !this.isBackOffice(actorRoles)) {
@@ -175,15 +162,7 @@ export class EventsService {
     }
     if (before.status !== EventStatus.DRAFT) throw new BadRequestException('Only DRAFT events can be submitted');
 
-    const event = await this.prisma.$transaction(async (tx) => {
-      await this.approvals.createOrResetRequest(tx, {
-        documentStage: DocumentStage.PRE_EVENT,
-        eventId: id,
-        amount: before.estimatedAmount,
-        departmentId: before.departmentId,
-      });
-      return tx.event.update({ where: { id }, data: { status: EventStatus.SUBMITTED }, include });
-    });
+    const event = await this.prisma.event.update({ where: { id }, data: { status: EventStatus.APPROVED }, include });
 
     await this.audit.log({ userId: actorId, action: 'SUBMIT', objectType: 'Event', objectId: id, oldValue: before.status, newValue: event.status });
     return event;
@@ -192,7 +171,7 @@ export class EventsService {
   // Approve/reject now live on the shared Approval Level engine (ApprovalsService.approve/reject).
 
   private isBackOffice(actorRoles: string[]): boolean {
-    return actorRoles.some((r) => r === 'ADMIN' || r === 'FINANCE');
+    return actorRoles.includes('ADMINISTRATOR');
   }
 
   // Unambiguous only when the Sales belongs to exactly one Department -

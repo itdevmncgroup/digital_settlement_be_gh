@@ -36,7 +36,7 @@ npm run start:dev
 ```
 
 Seed creates:
-- Roles (`SALES`, `SUPERVISOR`, `FINANCE`, `ADMIN`, `MANAGEMENT`) plus the Position chain
+- Roles (`SALES`, `SUPERVISOR`, `FINANCE`, `ADMINISTRATOR`, `MANAGEMENT`) plus the Position chain
   used by multi-tier approval (Head POD, Koordinator, Dept Head, BOD, Division Head, ...).
 - Units matching the MNC Group structure (`HOLDING`, `RCTI`, `MNCTV`, `GTV`) and default
   Activity Types.
@@ -85,7 +85,7 @@ API is served under `/api/v1`. Login via `POST /api/v1/auth/login`, then send
   an optional `salesId` in the body (same pattern as manual Expense entry).
 - **Two approval chains**:
   1. **Expense chain** — `Expense.status` mirrors the current tier
-     (`ExpenseStatus.APPROVAL_<POSITION_CODE>`), e.g. HEAD_POD → CO-CSO-1 → CO-CSO-2,
+     (`ExpenseStatus.APPROVAL_<POSITION_CODE>`), e.g. HEAD_POD → CO-CSO,
      terminal state `READY_TO_MATCHING`.
   2. **Settlement chain** — entered once matched Expenses are grouped into a
      `Settlement` (e.g. SLS_MAR_DIR → VP_ACC_BIL_TAX_3TV → CO_CFO_3TV). Each tier's

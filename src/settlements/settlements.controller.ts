@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { SettlementsService } from './settlements.service';
 import {
@@ -6,6 +6,7 @@ import {
   CreateSettlementDto,
   CreateSettlementFromSelectionDto,
   GenerateSettlementDto,
+  UpdateSettlementDto,
 } from './dto/settlement.dto';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { RejectDto } from '../approvals/dto/reject.dto';
@@ -19,7 +20,7 @@ import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorat
 // Department's bank-matched Expenses into one Settlement with a STL-YYMMDD#### id.
 @Controller('settlements')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE, RoleName.MANAGEMENT)
+@Roles(RoleName.SALES, RoleName.ADMIN, RoleName.MANAGEMENT)
 export class SettlementsController {
   constructor(
     private readonly service: SettlementsService,
@@ -51,7 +52,7 @@ export class SettlementsController {
   @Post('generate')
   @RequirePermission('settlement.create.owndept')
   generate(@Body() dto: GenerateSettlementDto, @CurrentUser() actor: AuthUser) {
-    return this.service.generate(dto.departmentId, dto.fromDate, dto.toDate, actor.userId, actor.roles);
+    return this.service.generate(dto.departmentId, dto.fromDate, dto.toDate, dto.paymentMethodGroup, actor.userId, actor.roles);
   }
 
   // "Buat baru" - commits the checked subset from the generate-preview table
@@ -59,7 +60,14 @@ export class SettlementsController {
   @Post('from-selection')
   @RequirePermission('settlement.create.owndept')
   createFromSelection(@Body() dto: CreateSettlementFromSelectionDto, @CurrentUser() actor: AuthUser) {
-    return this.service.createFromSelection(dto.departmentId, dto.expenseIds, actor.userId, actor.roles);
+    return this.service.createFromSelection(
+      dto.departmentId,
+      dto.expenseIds,
+      dto.paymentMethodGroup,
+      actor.userId,
+      actor.roles,
+      dto.allocations,
+    );
   }
 
   @Get(':id/eligible-expenses')
@@ -74,10 +82,28 @@ export class SettlementsController {
     return this.service.addExpenses(id, dto.expenseIds, actor.userId, actor.roles);
   }
 
+  // Settlement list's "Edit" button on a DRAFT_SETTLEMENT row - replaces the
+  // member Expenses and allocation rows.
+  @Patch(':id')
+  @RequirePermission('settlement.create.owndept')
+  update(@Param('id') id: string, @Body() dto: UpdateSettlementDto, @CurrentUser() actor: AuthUser) {
+    return this.service.update(id, dto.expenseIds, dto.allocations, actor.userId, actor.roles);
+  }
+
   @Post(':id/complete')
-  @Roles(RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.ADMIN)
   complete(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
     return this.service.complete(id, actor.userId);
+  }
+
+  // Settlement list's "Submit" button on a DRAFT_SETTLEMENT row - starts the
+  // batch's own approval chain (SLS_MAR_DIR -> VP -> CO_CFO). Distinct from
+  // :id/submit below, which is the per-tier approver's Submit once the chain
+  // is already running.
+  @Post(':id/submit-draft')
+  @RequirePermission('settlement.create.owndept')
+  submitDraft(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.submitDraft(id, actor.userId, actor.roles);
   }
 
   // The Settlement approval tier (SLS_MAR_DIR -> VP -> CO_CFO): its approver

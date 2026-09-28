@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsDateString, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 import { ParticipantCategory } from '@prisma/client';
 
 export class ExpenseItemDto {
@@ -61,6 +61,13 @@ export class CreateExpenseDto {
   @IsOptional()
   @IsString()
   departmentId?: string;
+
+  // Sales can park an Expense as a DRAFT (still theirs to edit, not yet visible
+  // to any approver) instead of submitting it straight into the approval chain.
+  // See ExpensesService.create/submitDraft.
+  @IsOptional()
+  @IsBoolean()
+  isDraft?: boolean;
 
   @IsOptional()
   @IsString()

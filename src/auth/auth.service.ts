@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -13,6 +13,33 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
   ) {}
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    meta: { ipAddress?: string | null; device?: string | null },
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.status !== 'ACTIVE') throw new UnauthorizedException('Invalid credentials');
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('New password must differ from current password');
+    }
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(newPassword, 10) } });
+    await this.audit.log({
+      userId,
+      action: 'UPDATE',
+      objectType: 'User',
+      objectId: userId,
+      newValue: { passwordChanged: true },
+      ipAddress: meta.ipAddress,
+      device: meta.device,
+    });
+    return { success: true };
+  }
 
   async login(email: string, password: string, meta: { ipAddress?: string | null; device?: string | null }) {
     const user = await this.prisma.user.findUnique({

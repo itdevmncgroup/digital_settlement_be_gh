@@ -1,0 +1,45 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\.ba7662d9ba2f5694010a26ffe7f059cb1285f7cf-audit.json",
+    "files": [
+        {
+            "date": 1789702656574,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-18.log",
+            "hash": "49b9a9b804e753d532f12e8bc99b87fa9dd5329b3f482b13110c06a1787d6f85"
+        },
+        {
+            "date": 1789962502122,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-21.log",
+            "hash": "ce15a5d4b79fc52b4933f601a5fb7fb535ee77eb1f9a693ca8e7a5a8cd79f40d"
+        },
+        {
+            "date": 1790047287527,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-22.log",
+            "hash": "abb734e02e2036cceb6769b7675051dbccab42bb1c93fe17aa9dc007c36cd9a9"
+        },
+        {
+            "date": 1790131486020,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-23.log",
+            "hash": "6d1da9c43e845ada7b4e482d0deab8e89637a05a00a9e0e1304a44b49a38eb0b"
+        },
+        {
+            "date": 1790218465059,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-24.log",
+            "hash": "47d206af3d9cf713b6923e71c137f4492766179de9056a4b6c75f2d36109dbd1"
+        },
+        {
+            "date": 1790300917501,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-25.log",
+            "hash": "50926fb1b97c4ffa0736cc9d336834886a70c56b676b7d385cbf203ce7d4ad88"
+        },
+        {
+            "date": 1790566617934,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-28.log",
+            "hash": "c02f02f173cdad9298dd1fa53dd3407c70acb09fb30e41c426d15d1e62bf9493"
+        }
+    ],
+    "hashType": "sha256"
+}

@@ -43,6 +43,48 @@ const SUBTOTAL_RE = /sub[\s-]*total/i;
 const TAX_RE = /(ppn|pajak|tax)/i;
 const SERVICE_CHARGE_RE = /(service\s*charge|biaya\s*layanan|order\s*fee)/i;
 const TOTAL_RE = /^\s*(grand\s*total|total)\b/i;
+// ATM/bank-transfer slips (BCA, ...) never print a "TOTAL" label - the
+// transferred amount is labeled "JUMLAH" instead. Only used as a fallback
+// when no TOTAL_RE line was found, since a merchant receipt with both labels
+// should keep TOTAL as authoritative.
+const JUMLAH_RE = /^\s*jumlah\b/i;
+
+// GoFood order-confirmation emails (distinct from EDC/ATM slips): the
+// merchant is the restaurant pickup location, not the "gofood" masthead or
+// the driver's name, and the payable "Total dibayar"/"Total pembayaran"
+// includes ongkir/biaya layanan on top of the actual order amount - the
+// generic TOTAL_RE loop below has no priority order and lands on whichever
+// "total ..." line comes last, which is one of those inflated figures.
+const GOFOOD_RE = /gofood/i;
+// The pickup line reads "Diantarkan jam 09:15 dari", with the restaurant
+// name printed on the line(s) right after it (sometimes wrapped across two
+// lines, e.g. "Christy Pudding," / "Boulevard Raya").
+const PICKUP_FROM_RE = /\bdari\s*$/i;
+// The restaurant's address (starting with "Jl.") follows the name - used to
+// know where the wrapped merchant name ends.
+const ADDRESS_LINE_RE = /^jl\.?\s/i;
+const TOTAL_HARGA_RE = /^\s*total\s*harga\b/i;
+
+// Shopee "Nota Pesanan" order receipts: merchant is the seller, printed as a
+// labeled "Nama Penjual: ..." field (next to an unrelated "Nama Pembeli:"
+// buyer field on the same row) rather than in the usual first-line/near-header
+// position. The page also prints several other "Total ..." lines (Total
+// Kuantitas, Total Diskon Pengiriman, ...) ahead of the real payable amount,
+// so the generic TOTAL_RE loop's last-match-wins behavior can't be trusted to
+// land on the right one - pin explicitly to "Total Pembayaran".
+const SHOPEE_RE = /shopee/i;
+const SELLER_NAME_RE = /nama\s*penjual\s*:?\s*(.+)/i;
+const TOTAL_PEMBAYARAN_RE = /^\s*total\s*pembayaran\b/i;
+
+// GrabFood order-confirmation emails: merchant is the restaurant under the
+// "Pesanan Dari" label (not the "Grab" masthead or the driver's name under
+// "Diterbitkan oleh Pengemudi"), wrapping onto the next line(s) until the
+// restaurant's "Jl. ..." address starts. The payable TOTAL already resolves
+// correctly through the generic TOTAL_RE loop (both the header "TOTAL" and
+// the bottom "TOTAL (INCL. TAX)" line carry the same figure), so only the
+// merchant name needs a Grab-specific override.
+const GRAB_RE = /\bgrab\b/i;
+const PESANAN_DARI_RE = /pesanan\s*dari\s*:?\s*(.*)$/i;
 
 // EDC/credit-card slips (BCA, Mandiri, BNI, ...) print the bank's own name as
 // the first line, with the actual merchant name on the line right after it -
@@ -51,6 +93,12 @@ const TOTAL_RE = /^\s*(grand\s*total|total)\b/i;
 // OCR a stray leading glyph onto that line (e.g. ". «BCA"), which would
 // otherwise defeat a `^`-anchored match.
 const BANK_HEADER_RE = /\b(bca|bri|bni|mandiri|cimb\s*niaga|danamon|permata|ocbc|panin|maybank|uob|hsbc|btn|bukopin|mega|commonwealth|sinarmas|btpn)\b/i;
+
+// ATM slips (withdrawal/transfer) print a standalone date-time line right
+// after the bank header, before the merchant/location line - e.g.
+// "** ATM BCA **" / "27/03/20 10:44:22" / "045V-CIRKLE K GANDARIA I". Skipped
+// when picking the merchant line so it doesn't get mistaken for the name.
+const PURE_DATETIME_LINE_RE = /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\s+\d{1,2}:\d{2}(:\d{2})?\s*$/;
 
 // Given a label line's index, find the amount attached to it: same line
 // first, then up to 2 lines below (an EDC slip often prints the label and its
@@ -145,7 +193,13 @@ export class OcrService {
     // anywhere in the receipt) so an unrelated later mention of a bank name
     // can't hijack merchant detection.
     const bankHeaderIndex = lines.slice(0, 3).findIndex((line) => BANK_HEADER_RE.test(line));
-    let merchantName = bankHeaderIndex >= 0 ? (lines[bankHeaderIndex + 1] ?? lines[0] ?? null) : (lines[0] ?? null);
+    let merchantName: string | null;
+    if (bankHeaderIndex >= 0) {
+      const afterHeader = lines.slice(bankHeaderIndex + 1);
+      merchantName = afterHeader.find((line) => !PURE_DATETIME_LINE_RE.test(line)) ?? lines[0] ?? null;
+    } else {
+      merchantName = lines[0] ?? null;
+    }
 
     // Prefer a line explicitly labeled as the date (avoids picking up an
     // unrelated number, e.g. inside a transaction/reference ID) - only fall
@@ -206,6 +260,73 @@ export class OcrService {
         }
       }
     });
+
+    if (total === null) {
+      const jumlahIndex = lines.findIndex((line) => JUMLAH_RE.test(line));
+      if (jumlahIndex >= 0) {
+        const value = findAmountNear(lines, jumlahIndex);
+        if (value !== null) {
+          total = value;
+          totalsStartIndex = Math.min(totalsStartIndex, jumlahIndex);
+        }
+      }
+    }
+
+    if (GOFOOD_RE.test(rawText)) {
+      const pickupIndex = lines.findIndex((line) => PICKUP_FROM_RE.test(line));
+      if (pickupIndex >= 0) {
+        const nameLines: string[] = [];
+        for (let i = pickupIndex + 1; i < lines.length && nameLines.length < 3; i++) {
+          if (ADDRESS_LINE_RE.test(lines[i])) break;
+          nameLines.push(lines[i]);
+        }
+        if (nameLines.length > 0) {
+          merchantName = nameLines.join(' ');
+        }
+      }
+
+      const totalHargaIndex = lines.findIndex((line) => TOTAL_HARGA_RE.test(line));
+      if (totalHargaIndex >= 0) {
+        const value = findAmountNear(lines, totalHargaIndex);
+        if (value !== null) {
+          total = value;
+        }
+      }
+    }
+
+    if (SHOPEE_RE.test(rawText)) {
+      const sellerLine = lines.find((line) => SELLER_NAME_RE.test(line));
+      const sellerMatch = sellerLine?.match(SELLER_NAME_RE);
+      if (sellerMatch && sellerMatch[1].trim()) {
+        merchantName = sellerMatch[1].trim();
+      }
+
+      const totalPembayaranIndex = lines.findIndex((line) => TOTAL_PEMBAYARAN_RE.test(line));
+      if (totalPembayaranIndex >= 0) {
+        const value = findAmountNear(lines, totalPembayaranIndex);
+        if (value !== null) {
+          total = value;
+        }
+      }
+    }
+
+    if (GRAB_RE.test(rawText)) {
+      const pesananDariIndex = lines.findIndex((line) => PESANAN_DARI_RE.test(line));
+      if (pesananDariIndex >= 0) {
+        const inlineMatch = lines[pesananDariIndex].match(PESANAN_DARI_RE);
+        const nameLines: string[] = [];
+        if (inlineMatch && inlineMatch[1].trim()) {
+          nameLines.push(inlineMatch[1].trim());
+        }
+        for (let i = pesananDariIndex + 1; i < lines.length && nameLines.length < 3; i++) {
+          if (ADDRESS_LINE_RE.test(lines[i])) break;
+          nameLines.push(lines[i]);
+        }
+        if (nameLines.length > 0) {
+          merchantName = nameLines.join(' ');
+        }
+      }
+    }
 
     const items: ParsedReceiptItem[] = [];
     const itemLines = lines.slice(1, totalsStartIndex);

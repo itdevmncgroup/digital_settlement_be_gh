@@ -13,6 +13,20 @@ NestJS 10 (Express) + TypeScript 5.5 + Prisma 5 + PostgreSQL. Auth: `@nestjs/jwt
 `tesseract.js` for bank-statement PDF parsing + OCR. `multer` pinned `^2.2.0` via
 `overrides` for a DoS fix. API served under global prefix `/api/v1`.
 
+Storage (`src/common/storage/providers/`) and OCR (`src/common/ocr/providers/`) are both
+provider-switched via env var (`STORAGE_PROVIDER`: local/s3/gdrive; `OCR_PROVIDER`:
+tesseract/textract/ai) — see `.env.example` for the per-backend config. `@aws-sdk/client-s3`,
+`@aws-sdk/client-textract`, `googleapis`, `@anthropic-ai/sdk` back the non-default backends.
+
+`DATABASE_URL` itself is also provider-switched: `DB_PROVIDER` (postgres/supabase/aws)
+picks which `DATABASE_URL_<PROVIDER>` value gets copied into `DATABASE_URL` before Prisma
+reads it — same `postgresql` Prisma provider throughout, just a different connection
+string. Resolved in `src/config/resolve-database-url.ts` (app boot, `main.ts`) and
+`scripts/resolve-database-url.js` (a `-r` preload wired into the `prisma:*`/`seed` npm
+scripts, since the Prisma CLI is a separate process). Standalone scripts under `scripts/`
+that call `new PrismaClient()` directly (not through those npm scripts) still expect
+`DATABASE_URL` exported in the shell — they don't go through this resolver.
+
 No test suite exists (`npm test` not defined) — don't assume Jest is wired up.
 
 ## Windows path caveat
@@ -68,7 +82,9 @@ Nest module pattern throughout: `*.module.ts` + `*.controller.ts` + `*.service.t
 Two separate approval chains:
 1. **Expense chain** — `Expense.status` mirrors current tier
    (`ExpenseStatus.APPROVAL_<POSITION_CODE>`, `-` normalized to `_` in position codes),
-   e.g. HEAD_POD → CO-CSO-1 → CO-CSO-2, terminal state `READY_TO_MATCHING`.
+   e.g. HEAD_POD → CO-CSO, terminal state `READY_TO_MATCHING`. (CO-CSO-1/CO-CSO-2 were
+   merged into the single CO-CSO tier — `APPROVAL_CO_CSO_1`/`_2` stay in the enum only
+   for historical rows.)
 2. **Settlement chain** — entered once matched Expenses are grouped into a `Settlement`
    (SLS_MAR_DIR → VP_ACC_BIL_TAX_3TV → CO_CFO_3TV). Tier advances only when the approver
    reviews every member Expense individually then submits the batch in one call

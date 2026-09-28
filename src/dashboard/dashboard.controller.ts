@@ -21,6 +21,32 @@ export class MyDashboardController {
   mine(@CurrentUser() actor: AuthUser) {
     return this.service.getMyDashboard(actor);
   }
+
+  // Head POD's own-pod dashboard; the service rejects non-Head-POD callers.
+  @Get('head-pod')
+  headPod(@CurrentUser() actor: AuthUser) {
+    return this.service.getHeadPodDashboard(actor);
+  }
+
+  // CO-CSO's dashboard across every Department they cover.
+  @Get('co-cso')
+  coCso(@CurrentUser() actor: AuthUser) {
+    return this.service.getCoCsoDashboard(actor);
+  }
+
+  // Management's dashboard across their Department(s); the service rejects non-Management callers.
+  @Get('management')
+  management(@CurrentUser() actor: AuthUser) {
+    return this.service.getManagementDashboard(actor);
+  }
+
+  // Sales' own-expense dashboard (this month / pending approval / fully approved).
+  @Get('sales')
+  @UseGuards(RolesGuard)
+  @RequirePermission('dashboard-sales.read.own')
+  sales(@CurrentUser() actor: AuthUser) {
+    return this.service.getSalesDashboard(actor);
+  }
 }
 
 // Management Dashboard (BRD section 5.5, 37) - Management/Admin/Finance always
@@ -30,7 +56,7 @@ export class MyDashboardController {
 // each report is computed under - see DashboardService.resolveDepartmentScope().
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleName.MANAGEMENT, RoleName.ADMIN, RoleName.FINANCE)
+@Roles(RoleName.MANAGEMENT, RoleName.ADMIN)
 @RequirePermission('dashboard.read.all', 'dashboard.read.owndept')
 export class DashboardController {
   constructor(private readonly service: DashboardService) {}

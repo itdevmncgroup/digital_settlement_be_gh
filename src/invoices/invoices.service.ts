@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { canAccessExpenseOwnedRecord } from '../common/rbac/scope.util';
+import { canAccessExpenseOwnedRecord, canUploadExpenseFiles } from '../common/rbac/scope.util';
 import { CreateInvoiceDto, UpdateInvoiceDto } from './dto/invoice.dto';
 
 const include = { merchant: true, files: true, modifiedBy: { select: { id: true, name: true } } } as const;
@@ -31,8 +31,9 @@ const EDITABLE_STATUSES: ExpenseStatus[] = [
   ExpenseStatus.APPROVAL_DEPT_HEAD,
   ExpenseStatus.APPROVAL_DIV_HEAD,
   ExpenseStatus.APPROVAL_BOD,
-  ExpenseStatus.APPROVAL_CO_CSO_1,
-  ExpenseStatus.APPROVAL_CO_CSO_2,
+  ExpenseStatus.APPROVAL_CO_CSO,
+  ExpenseStatus.APPROVAL_CO_CSO_1, // legacy, pre-merge rows only
+  ExpenseStatus.APPROVAL_CO_CSO_2, // legacy, pre-merge rows only
 ];
 
 @Injectable()
@@ -53,8 +54,8 @@ export class InvoicesService {
     return invoice;
   }
 
-  async createForExpense(expenseId: string, dto: CreateInvoiceDto, actorId: string, actorRoles: string[] = []) {
-    const expense = await this.getEditableExpenseOrThrow(expenseId, actorId, actorRoles);
+  async createForExpense(expenseId: string, dto: CreateInvoiceDto, actorId: string, actorRoles: string[] = [], actorPermissions: string[] = []) {
+    const expense = await this.getEditableExpenseOrThrow(expenseId, actorId, actorRoles, actorPermissions);
 
     const invoice = await this.prisma.invoice.create({
       data: {
@@ -87,10 +88,10 @@ export class InvoicesService {
 
   // BRD section 21 - Invoice Data Integrity: OCR value is never overwritten,
   // only final_* + modifiedBy/modifiedAt change here.
-  async update(id: string, dto: UpdateInvoiceDto, actorId: string, actorRoles: string[] = []) {
+  async update(id: string, dto: UpdateInvoiceDto, actorId: string, actorRoles: string[] = [], actorPermissions: string[] = []) {
     const before = await this.prisma.invoice.findUnique({ where: { id }, include: { expense: true } });
     if (!before) throw new NotFoundException('Invoice not found');
-    await this.getEditableExpenseOrThrow(before.expenseId, actorId, actorRoles);
+    await this.getEditableExpenseOrThrow(before.expenseId, actorId, actorRoles, actorPermissions);
 
     const invoice = await this.prisma.invoice.update({
       where: { id },
@@ -121,10 +122,10 @@ export class InvoicesService {
     return invoice;
   }
 
-  async addFile(invoiceId: string, file: Express.Multer.File, fileType: 'ORIGINAL' | 'PROCESSED', actorId: string, actorRoles: string[] = []) {
+  async addFile(invoiceId: string, file: Express.Multer.File, fileType: 'ORIGINAL' | 'PROCESSED', actorId: string, actorRoles: string[] = [], actorPermissions: string[] = []) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId }, include: { expense: true } });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    await this.getEditableExpenseOrThrow(invoice.expenseId, actorId, actorRoles);
+    await this.getEditableExpenseOrThrow(invoice.expenseId, actorId, actorRoles, actorPermissions);
 
     const stored = await this.storage.save(file.buffer, `invoice/${invoice.expenseId}`, file.originalname);
 
@@ -154,7 +155,8 @@ export class InvoicesService {
 
     await this.audit.log({ userId: actor.userId, action: 'DOWNLOAD', objectType: 'InvoiceFile', objectId: file.id });
 
-    return { path: this.storage.resolvePath(file.storageKey), fileName: file.fileName, mimeType: file.mimeType };
+    const buffer = await this.storage.read(file.storageKey);
+    return { buffer, fileName: file.fileName, mimeType: file.mimeType };
   }
 
   private async assertCanAccess(owner: { salesId: string; departmentId?: string | null }, actor: AuthUser) {
@@ -163,11 +165,14 @@ export class InvoicesService {
     }
   }
 
-  private async getEditableExpenseOrThrow(expenseId: string, actorId: string, actorRoles: string[] = []) {
+  private async getEditableExpenseOrThrow(expenseId: string, actorId: string, actorRoles: string[] = [], actorPermissions: string[] = []) {
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
     if (!expense) throw new NotFoundException('Expense not found');
     if (expense.salesId !== actorId && !this.isBackOffice(actorRoles)) {
       throw new ForbiddenException('Not owner of this expense');
+    }
+    if (!canUploadExpenseFiles(expense, { userId: actorId, roles: actorRoles, permissions: actorPermissions })) {
+      throw new ForbiddenException('Changing invoices requires edit permission on this expense');
     }
     if (!EDITABLE_STATUSES.includes(expense.status)) {
       throw new BadRequestException(`Expense in status ${expense.status} cannot be modified`);
@@ -176,6 +181,6 @@ export class InvoicesService {
   }
 
   private isBackOffice(actorRoles: string[]): boolean {
-    return actorRoles.some((r) => r === 'ADMIN' || r === 'FINANCE');
+    return actorRoles.includes('ADMINISTRATOR');
   }
 }

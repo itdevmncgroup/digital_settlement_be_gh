@@ -3,9 +3,9 @@ import { RoleName } from '../constants/role-name';
 import { AuthUser } from '../decorators/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 
-const BACK_OFFICE_ROLES: string[] = [RoleName.ADMIN, RoleName.FINANCE, RoleName.SUPERVISOR, RoleName.MANAGEMENT];
+const BACK_OFFICE_ROLES: string[] = [RoleName.ADMIN, RoleName.MANAGEMENT];
 
-/** True if the user can see records beyond their own (Admin/Finance/Supervisor/Management). */
+/** True if the user can see records beyond their own (Admin/Management). */
 export function canViewAllRecords(user: AuthUser): boolean {
   return user.roles.some((r) => BACK_OFFICE_ROLES.includes(r));
 }
@@ -64,4 +64,22 @@ export async function canAccessExpenseOwnedRecord(
     if (actorDeptIds.includes(owner.departmentId)) return true;
   }
   return false;
+}
+
+// Attaching photos/invoices to an existing Expense is an edit: it needs one of
+// the expense.edit.* permissions (ADMIN is back office and exempt).
+// Exception: the owner's create flow (new-expense form) creates the Expense and
+// then uploads its photos/invoices in follow-up requests, so the owner may still
+// attach files for a short window after creating it, edit permission or not.
+export const CREATE_FLOW_UPLOAD_WINDOW_MS = 15 * 60 * 1000;
+
+export function canUploadExpenseFiles(
+  expense: { salesId: string; createdAt: Date },
+  actor: { userId: string; roles?: string[]; permissions?: string[] },
+): boolean {
+  const roles = actor.roles ?? [];
+  const permissions = actor.permissions ?? [];
+  if (roles.includes(RoleName.ADMIN)) return true;
+  if (['expense.edit.all', 'expense.edit.own', 'expense.edit.owndept'].some((p) => permissions.includes(p))) return true;
+  return expense.salesId === actor.userId && Date.now() - expense.createdAt.getTime() <= CREATE_FLOW_UPLOAD_WINDOW_MS;
 }

@@ -13,8 +13,12 @@ export class CreditCardsController {
   constructor(private readonly service: CreditCardsService) {}
 
   @Get()
-  findAll(@Query('departmentId') departmentId?: string, @Query('active') active?: string) {
-    return this.service.findAll(departmentId, active === 'true');
+  findAll(
+    @Query('departmentId') departmentId?: string,
+    @Query('positionId') positionId?: string,
+    @Query('active') active?: string,
+  ) {
+    return this.service.findAll(departmentId, positionId, active === 'true');
   }
 
   @Get(':id')

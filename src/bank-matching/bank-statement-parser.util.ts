@@ -15,7 +15,7 @@
 import { Logger } from '@nestjs/common';
 import { recognizePages } from '../common/ocr/recognize-text.util';
 import { extractPdfText } from '../common/pdf/pdfjs-text.util';
-import { renderPdfPagesToImages } from './pdf-to-images.util';
+import { streamPdfPagesToImages } from './pdf-to-images.util';
 
 const logger = new Logger('BankStatementParser');
 
@@ -166,11 +166,10 @@ export async function parseBankStatementPdf(buffer: Buffer): Promise<ParsedBankL
   // No usable text layer - render each page to an image and OCR it instead,
   // same engine as the receipt-photo OCR flow.
   logger.log(`No usable text layer (${extracted.text.trim().length} chars) - falling back to OCR.`);
-  const pageImages = await renderPdfPagesToImages(buffer);
-  const ocrResults = await recognizePages(pageImages);
+  const ocrResults = await recognizePages(streamPdfPagesToImages(buffer));
   const results: ParsedBankLine[] = [];
   ocrResults.forEach(({ text, confidence }, i) => {
-    logger.log(`OCR page ${i + 1}/${pageImages.length}: confidence ${confidence.toFixed(1)}, ${text.length} chars.`);
+    logger.log(`OCR page ${i + 1}/${ocrResults.length}: confidence ${confidence.toFixed(1)}, ${text.length} chars.`);
     results.push(...parseTransactionLines(text, results.length));
   });
   return results;

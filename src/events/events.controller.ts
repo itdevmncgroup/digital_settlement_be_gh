@@ -32,19 +32,19 @@ export class EventsController {
   }
 
   @Post()
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   create(@Body() dto: CreateEventDto, @CurrentUser() actor: AuthUser) {
     return this.service.create(dto, actor.userId, actor.roles);
   }
 
   @Patch(':id')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateEventDto, @CurrentUser() actor: AuthUser) {
     return this.service.update(id, dto, actor.userId, actor.roles);
   }
 
   @Post(':id/submit')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   submit(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
     return this.service.submit(id, actor.userId, actor.roles);
   }

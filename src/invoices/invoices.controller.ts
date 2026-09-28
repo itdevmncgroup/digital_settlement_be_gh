@@ -42,7 +42,7 @@ export class InvoicesController {
   // after the user picks a receipt image on the create-expense form, so the
   // parsed items/totals can pre-fill the form before anything is saved.
   @Post('invoices/ocr-scan')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   @RequirePermission('expense.create.all', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -62,10 +62,10 @@ export class InvoicesController {
   }
 
   @Post('expenses/:expenseId/invoices')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   @RequirePermission('expense.create.all', 'expense.create.owndept')
   create(@Param('expenseId') expenseId: string, @Body() dto: CreateInvoiceDto, @CurrentUser() actor: AuthUser) {
-    return this.service.createForExpense(expenseId, dto, actor.userId, actor.roles);
+    return this.service.createForExpense(expenseId, dto, actor.userId, actor.roles, actor.permissions);
   }
 
   @Get('invoices/:id')
@@ -74,13 +74,13 @@ export class InvoicesController {
   }
 
   @Patch('invoices/:id')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateInvoiceDto, @CurrentUser() actor: AuthUser) {
-    return this.service.update(id, dto, actor.userId, actor.roles);
+    return this.service.update(id, dto, actor.userId, actor.roles, actor.permissions);
   }
 
   @Post('invoices/:id/files')
-  @Roles(RoleName.SALES, RoleName.ADMIN, RoleName.FINANCE)
+  @Roles(RoleName.SALES, RoleName.ADMIN)
   @RequirePermission('expense.create.all', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -101,7 +101,7 @@ export class InvoicesController {
     @CurrentUser() actor: AuthUser,
   ) {
     if (!file) throw new NotFoundException('No file uploaded');
-    return this.service.addFile(id, file, fileType, actor.userId, actor.roles);
+    return this.service.addFile(id, file, fileType, actor.userId, actor.roles, actor.permissions);
   }
 
   @Get('invoices/files/:fileId/download')
@@ -109,6 +109,6 @@ export class InvoicesController {
     const file = await this.service.getFileForDownload(fileId, actor);
     res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
     res.setHeader('Content-Type', file.mimeType);
-    res.sendFile(file.path);
+    res.send(file.buffer);
   }
 }
