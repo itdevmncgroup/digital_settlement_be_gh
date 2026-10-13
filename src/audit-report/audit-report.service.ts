@@ -80,7 +80,7 @@ export class AuditReportService {
   private buildExpenseWhere(filter: AuditReportFilter, departmentIds?: string[]) {
     return {
       departmentId: this.scopedDepartmentWhere(filter.departmentId, departmentIds),
-      status: { not: ExpenseStatus.DRAFT },
+      status: { notIn: [ExpenseStatus.DRAFT, ExpenseStatus.PENDING_SALES_ADMIN] },
       expenseDate: {
         gte: filter.from ? new Date(filter.from) : undefined,
         lte: filter.to ? new Date(filter.to) : undefined,
@@ -161,7 +161,7 @@ export class AuditReportService {
   private async findMissingReceiptCandidates(): Promise<FindingCandidate[]> {
     const expenses = await this.prisma.expense.findMany({
       where: {
-        status: { not: ExpenseStatus.DRAFT },
+        status: { notIn: [ExpenseStatus.DRAFT, ExpenseStatus.PENDING_SALES_ADMIN] },
         OR: [{ invoices: { none: {} } }, { invoices: { every: { files: { none: {} } } } }],
       },
       select: { id: true, amount: true, departmentId: true, expenseDate: true },

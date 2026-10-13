@@ -170,8 +170,8 @@ async function main() {
           currentStep: 0, status: ApprovalStatus.PENDING,
           steps: {
             create: [
-              { stepOrder: 0, positionId: positions.DEPT_HEAD.id, resolvedApproverId: hendra.id, status: ApprovalStepStatus.PENDING },
-              { stepOrder: 1, positionId: positions.DIV_HEAD.id, resolvedApproverId: bambang.id, status: ApprovalStepStatus.PENDING },
+              { stepOrder: 0, positionId: positions['DEPT-HEAD'].id, resolvedApproverId: hendra.id, status: ApprovalStepStatus.PENDING },
+              { stepOrder: 1, positionId: positions['DIV-HEAD'].id, resolvedApproverId: bambang.id, status: ApprovalStepStatus.PENDING },
               { stepOrder: 2, positionId: positions.BOD.id, resolvedApproverId: diana.id, status: ApprovalStepStatus.PENDING },
             ],
           },
@@ -184,15 +184,15 @@ async function main() {
           currentStep: 0, status: ApprovalStatus.REJECTED,
           steps: {
             create: [
-              { stepOrder: 0, positionId: positions.DEPT_HEAD.id, resolvedApproverId: hendra.id, status: ApprovalStepStatus.REJECTED },
-              { stepOrder: 1, positionId: positions.DIV_HEAD.id, resolvedApproverId: bambang.id, status: ApprovalStepStatus.PENDING },
+              { stepOrder: 0, positionId: positions['DEPT-HEAD'].id, resolvedApproverId: hendra.id, status: ApprovalStepStatus.REJECTED },
+              { stepOrder: 1, positionId: positions['DIV-HEAD'].id, resolvedApproverId: bambang.id, status: ApprovalStepStatus.PENDING },
               { stepOrder: 2, positionId: positions.BOD.id, resolvedApproverId: diana.id, status: ApprovalStepStatus.PENDING },
             ],
           },
         },
       });
       await prisma.approvalAction.create({
-        data: { approvalRequestId: ar.id, actorId: hendra.id, positionId: positions.DEPT_HEAD.id, action: 'REJECT', reason: d.rejectReason },
+        data: { approvalRequestId: ar.id, actorId: hendra.id, positionId: positions['DEPT-HEAD'].id, action: 'REJECT', reason: d.rejectReason },
       });
     } else if (d.status === ExpenseStatus.APPROVED || d.status === ExpenseStatus.SETTLED) {
       const ar = await prisma.approvalRequest.create({
@@ -201,8 +201,8 @@ async function main() {
           currentStep: 3, status: ApprovalStatus.APPROVED,
           steps: {
             create: [
-              { stepOrder: 0, positionId: positions.DEPT_HEAD.id, resolvedApproverId: hendra.id, status: ApprovalStepStatus.APPROVED },
-              { stepOrder: 1, positionId: positions.DIV_HEAD.id, resolvedApproverId: bambang.id, status: ApprovalStepStatus.APPROVED },
+              { stepOrder: 0, positionId: positions['DEPT-HEAD'].id, resolvedApproverId: hendra.id, status: ApprovalStepStatus.APPROVED },
+              { stepOrder: 1, positionId: positions['DIV-HEAD'].id, resolvedApproverId: bambang.id, status: ApprovalStepStatus.APPROVED },
               { stepOrder: 2, positionId: positions.BOD.id, resolvedApproverId: diana.id, status: ApprovalStepStatus.APPROVED },
             ],
           },
@@ -210,8 +210,8 @@ async function main() {
       });
       await prisma.approvalAction.createMany({
         data: [
-          { approvalRequestId: ar.id, actorId: hendra.id, positionId: positions.DEPT_HEAD.id, action: 'APPROVE' },
-          { approvalRequestId: ar.id, actorId: bambang.id, positionId: positions.DIV_HEAD.id, action: 'APPROVE' },
+          { approvalRequestId: ar.id, actorId: hendra.id, positionId: positions['DEPT-HEAD'].id, action: 'APPROVE' },
+          { approvalRequestId: ar.id, actorId: bambang.id, positionId: positions['DIV-HEAD'].id, action: 'APPROVE' },
           { approvalRequestId: ar.id, actorId: diana.id, positionId: positions.BOD.id, action: 'APPROVE' },
         ],
       });

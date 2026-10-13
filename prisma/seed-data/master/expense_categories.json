@@ -1,0 +1,34 @@
+[
+ {
+  "id": "36e281f8-3aea-4f52-a838-e1b87cad2abc",
+  "code": "GIFT",
+  "name": "Client Gift",
+  "createdAt": "2026-09-07T10:52:38.166Z",
+  "isActive": true,
+  "policyLimit": "1000000"
+ },
+ {
+  "id": "7a51623c-b8b7-4efb-82aa-62c1ed55af57",
+  "code": "OTHER",
+  "name": "Other",
+  "createdAt": "2026-09-07T10:52:38.166Z",
+  "isActive": true,
+  "policyLimit": null
+ },
+ {
+  "id": "cd413de3-f77b-4174-b114-84053fc8c3b2",
+  "code": "MEAL",
+  "name": "Meals & Entertainment",
+  "createdAt": "2026-09-07T10:52:38.165Z",
+  "isActive": true,
+  "policyLimit": null
+ },
+ {
+  "id": "efd10097-72e9-4c37-ae50-60438c26f9e9",
+  "code": "TRANSPORT",
+  "name": "Transportation",
+  "createdAt": "2026-09-07T10:52:38.165Z",
+  "isActive": true,
+  "policyLimit": null
+ }
+]

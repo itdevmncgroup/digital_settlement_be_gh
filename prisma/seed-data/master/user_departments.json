@@ -1,0 +1,429 @@
+[
+ {
+  "id": "00e2bdb2-b1b4-46bc-a262-04fa573f65e9",
+  "userId": "45f8c4f1-26ff-4b56-961d-471aa1f79ede",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:24:51.291Z"
+ },
+ {
+  "id": "04662a71-6887-48e5-b4c1-26c0343b7a0a",
+  "userId": "3b7221ab-2553-44a3-9b6d-ca335cf75580",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:04.249Z"
+ },
+ {
+  "id": "07b35751-4950-49ca-8e7e-71b64161501b",
+  "userId": "4b1bee4d-673b-40e8-852a-34ea8e719663",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:45:18.990Z"
+ },
+ {
+  "id": "0c0ac072-f65e-44be-8c92-eeab3ea4f943",
+  "userId": "5ab254fb-1f42-487b-9666-010125d94b1a",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-09T07:28:59.384Z"
+ },
+ {
+  "id": "13ca6263-5d20-4fa1-97ac-101259f49f53",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:16.011Z"
+ },
+ {
+  "id": "22b6fa3b-a21c-410b-8c8e-0db277948231",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:16.011Z"
+ },
+ {
+  "id": "270722a9-74fa-4569-a7f4-08fa2d583f0d",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988d",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:31.796Z"
+ },
+ {
+  "id": "280d565b-700d-4484-8af5-825e4dde2193",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:39.893Z"
+ },
+ {
+  "id": "2832bae8-b460-4312-8938-3e96c0bd2436",
+  "userId": "4b1bee4d-673b-40e8-852a-34ea8e719663",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:45:18.990Z"
+ },
+ {
+  "id": "2bcf2a29-4489-4ad1-9cec-9544918b5e9f",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988e",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-11T17:06:23.269Z"
+ },
+ {
+  "id": "301c09b1-c260-4a20-b931-5f00a509cbe3",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:39.893Z"
+ },
+ {
+  "id": "372df831-7fa8-4473-a79a-b90e4edea932",
+  "userId": "6dcf4b86-5483-44b6-8a3a-641e4c2c075e",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:25:52.443Z"
+ },
+ {
+  "id": "42b22dad-bbb7-4af5-b293-a6e4304d1118",
+  "userId": "5ab254fb-1f42-487b-9666-010125d94b1a",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-09T07:28:59.384Z"
+ },
+ {
+  "id": "44d3ccbb-ce7f-4bfa-948c-c8c924485f14",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:39.893Z"
+ },
+ {
+  "id": "52a387f7-3066-4f25-966c-a14d18987172",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:02:44.593Z"
+ },
+ {
+  "id": "550c8140-522c-4958-91f9-83932ebe5747",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988d",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:31.796Z"
+ },
+ {
+  "id": "5550fd46-6f5f-46e6-9bde-addebae50012",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988d",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:31.796Z"
+ },
+ {
+  "id": "5767247c-eebe-4376-89f5-af4198858e7f",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:13:34.781Z"
+ },
+ {
+  "id": "59120632-8015-4a80-8042-0720c269a85a",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:16.011Z"
+ },
+ {
+  "id": "5a4069a3-c43e-4a1b-a5fa-e128a5fcf00c",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:28.901Z"
+ },
+ {
+  "id": "5a4aaa06-a191-4eac-9c86-d99142523074",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:28.901Z"
+ },
+ {
+  "id": "615a1039-47c2-44f2-9765-4b272e22ba42",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:28.901Z"
+ },
+ {
+  "id": "62fc01a2-a80b-4c92-9d62-5a870c49c826",
+  "userId": "270e2f67-2834-4571-8e16-0dc9c10931d4",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-11T17:06:23.269Z"
+ },
+ {
+  "id": "66d7f414-9ce7-42b1-be56-e257afcd4dbb",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:13:34.781Z"
+ },
+ {
+  "id": "6df48333-8041-4d18-b252-803db579658e",
+  "userId": "5ab254fb-1f42-487b-9666-010125d94b1a",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-09T07:28:59.384Z"
+ },
+ {
+  "id": "759d478d-9d1e-4c52-9a4a-05f3da909f8d",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:16.011Z"
+ },
+ {
+  "id": "7a5538a7-ccc5-4725-8ec0-7a3e323cfba8",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988d",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:31.796Z"
+ },
+ {
+  "id": "7f001d79-7ae2-4249-ba36-13c983c75d31",
+  "userId": "5ab254fb-1f42-487b-9666-010125d94b1a",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-09T07:28:59.384Z"
+ },
+ {
+  "id": "83152acb-73d1-4e2f-8f10-af7855ae4266",
+  "userId": "c52e136c-0a80-4433-b548-4dad6ba351c8",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:25:40.565Z"
+ },
+ {
+  "id": "835b8c23-2818-434e-a895-0efc3fbdcc64",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:02:44.593Z"
+ },
+ {
+  "id": "888b9189-80e4-413c-90e2-549698bcf7db",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:39.893Z"
+ },
+ {
+  "id": "89e4ebd6-cbbe-49f0-b9af-b50ad64e6bc1",
+  "userId": "312ede40-3d9e-4b6e-8b02-c3bb2af0685a",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:25:58.227Z"
+ },
+ {
+  "id": "8d0a349c-77a2-4852-a23f-f85cf19c1bb2",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:16.011Z"
+ },
+ {
+  "id": "928c4ec9-4a41-4d4d-9986-cb607bf018e4",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:28.901Z"
+ },
+ {
+  "id": "96cbc671-4577-4569-bf30-2f3d0d66462e",
+  "userId": "a2a4df53-4957-403a-aaef-844979405f45",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:29:58.919Z"
+ },
+ {
+  "id": "98d84a8d-1371-41c1-b264-dff63992075e",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:13:34.781Z"
+ },
+ {
+  "id": "a4060a90-781f-4102-ba41-42ce39eeeab9",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988d",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:31.796Z"
+ },
+ {
+  "id": "a58dd5d0-57c0-48eb-a88d-84ae108c4d01",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:39.893Z"
+ },
+ {
+  "id": "a7cf85dd-cdc0-49a7-9e4e-a2855d96ef51",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988d",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:31.796Z"
+ },
+ {
+  "id": "aaafa002-2e68-4fd9-ba27-88d41e8170cc",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:28.901Z"
+ },
+ {
+  "id": "ae5af1a5-c123-4f5d-b1f8-2b6f9bf0b790",
+  "userId": "5ab254fb-1f42-487b-9666-010125d94b1a",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-09T07:28:59.384Z"
+ },
+ {
+  "id": "ae88fcfa-316a-4b57-8d30-42d907cb0150",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:28.901Z"
+ },
+ {
+  "id": "b1a5331a-6197-4135-a0e7-ecf5f88a7114",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:16.011Z"
+ },
+ {
+  "id": "b3ee62eb-0562-4dc1-95be-fce02dc19852",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:39.893Z"
+ },
+ {
+  "id": "b434ef5e-6bff-4d70-9bd6-e2ba6f8e5a96",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:02:44.593Z"
+ },
+ {
+  "id": "b9e42333-b7aa-44dc-81bf-4b4a4f494eab",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:13:34.781Z"
+ },
+ {
+  "id": "bd686c09-b739-4976-a535-56139972b48c",
+  "userId": "a24b68ab-d690-442c-af87-3eef3547a529",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:35:23.837Z"
+ },
+ {
+  "id": "c15e941a-83bf-4161-903b-244e2a2e9f6a",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:02:44.593Z"
+ },
+ {
+  "id": "c6624043-f30a-47f0-b816-01a0ea360be3",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:16.011Z"
+ },
+ {
+  "id": "cf6687f5-1e2e-472a-b142-2af6327a5ccb",
+  "userId": "5ab254fb-1f42-487b-9666-010125d94b1a",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-09T07:28:59.384Z"
+ },
+ {
+  "id": "d05c0dd2-6ef7-41b9-bb51-3cfe08d38689",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:13:34.781Z"
+ },
+ {
+  "id": "d4763e73-e5d3-4e0c-967f-0074dd260d54",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:13:34.781Z"
+ },
+ {
+  "id": "d79f6228-6b11-4d05-ba54-98e67f9311b4",
+  "userId": "8cbf5076-990b-4da1-bc54-8fbc64a4fd24",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:25:17.768Z"
+ },
+ {
+  "id": "dd0319f9-cbf6-4dcf-8f61-f26bd995174a",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:13:34.781Z"
+ },
+ {
+  "id": "ead4b1e4-219a-4f6f-930b-133b90df3192",
+  "userId": "ee754ba2-dd4f-4ea1-8dfa-86d8b3a82989",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:25:25.054Z"
+ },
+ {
+  "id": "eae97030-8f0e-4235-95a2-586099f0d7e6",
+  "userId": "2bbdd959-0c30-4299-a316-60184f68988d",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:36:31.796Z"
+ },
+ {
+  "id": "eb051c56-3e01-4ea1-aeea-589eec18d113",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:39.893Z"
+ },
+ {
+  "id": "edfdfd46-3278-4389-84c6-df22c2c21245",
+  "userId": "4b1bee4d-673b-40e8-852a-34ea8e719663",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:45:18.990Z"
+ },
+ {
+  "id": "f2851b0d-150f-464b-bcbd-ed69477b9d68",
+  "userId": "6439dfcd-4e59-4e11-8590-47170aab1657",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T12:25:47.458Z"
+ },
+ {
+  "id": "f47652e0-c50d-4d27-8c54-275b85f39f60",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T03:57:28.901Z"
+ },
+ {
+  "id": "fdcefcc7-0d15-4f91-841b-e09c808cda72",
+  "userId": "5ab254fb-1f42-487b-9666-010125d94b1a",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-09T07:28:59.384Z"
+ }
+]

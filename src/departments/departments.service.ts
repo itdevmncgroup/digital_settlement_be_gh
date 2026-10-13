@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { assertUnused, deleteRecord } from '../common/delete.util';
 import {
   AddDepartmentApproverDto,
   AddDepartmentAssignmentDto,
@@ -188,5 +189,21 @@ export class DepartmentsService {
         `Brand "${brand.name}" belongs to Advertiser "${brand.advertiser.name}", which is not under the selected Agency`,
       );
     }
+  }
+
+  async remove(id: string, actorId: string) {
+    const before = await this.findOne(id);
+    // FK is ON DELETE SET NULL - the database would silently orphan these, so refuse instead.
+    await assertUnused('Department', [
+      ['expense(s)', this.prisma.expense.count({ where: { departmentId: id } })],
+      ['event(s)', this.prisma.event.count({ where: { departmentId: id } })],
+      ['expense request(s)', this.prisma.expenseRequest.count({ where: { departmentId: id } })],
+      ['bank statement batch(es)', this.prisma.bankSettlementBatch.count({ where: { departmentId: id } })],
+      ['credit card(s)', this.prisma.creditCard.count({ where: { departmentId: id } })],
+      ['audit finding(s)', this.prisma.auditFinding.count({ where: { departmentId: id } })],
+    ]);
+    await deleteRecord('Department', () => this.prisma.department.delete({ where: { id } }));
+    await this.audit.log({ userId: actorId, action: 'DELETE', objectType: 'Department', objectId: id, oldValue: before });
+    return { id };
   }
 }

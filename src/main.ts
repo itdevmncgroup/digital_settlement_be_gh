@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { NestWinstonLogger } from './common/logger/nest-logger.service';
@@ -28,9 +29,18 @@ process.on('unhandledRejection', (reason) => {
   winstonLogger.error(`unhandledRejection: ${err.message}`, { stack: err.stack });
 });
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: new NestWinstonLogger() });
+// ExternalSyncService.pushSettlement bundles every photo/invoice file of a
+// settlement's expenses (each up to MAX_UPLOAD_SIZE_BYTES, base64-encoded) into
+// one JSON POST to /external/settlements - easily tens of MB. Express's
+// body-parser default (100kb) rejects that outright with PayloadTooLargeError,
+// so the global json/urlencoded limits are raised well above the per-file cap.
+const EXTERNAL_PUSH_BODY_LIMIT = '50mb';
 
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, { logger: new NestWinstonLogger(), bodyParser: false });
+
+  app.use(json({ limit: EXTERNAL_PUSH_BODY_LIMIT }));
+  app.use(urlencoded({ extended: true, limit: EXTERNAL_PUSH_BODY_LIMIT }));
   app.use(helmet());
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableCors();

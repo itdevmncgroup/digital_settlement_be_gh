@@ -26,10 +26,23 @@ const RENDER_SCALE = 3;
 // long statement first can exhaust memory and kill the process mid-request
 // (which the frontend proxy sees as an ECONNRESET). Streaming lets each page
 // be OCR'd and released before the next is rendered.
-export async function* streamPdfPagesToImages(buffer: Buffer): AsyncGenerator<Buffer> {
+export async function* streamPdfPagesToImages(buffer: Buffer, scale = RENDER_SCALE): AsyncGenerator<Buffer> {
   const { pdf } = await loadPdfToImg();
-  const doc = await pdf(buffer, { scale: RENDER_SCALE });
+  const doc = await pdf(buffer, { scale });
   for await (const page of doc) {
     yield page as Buffer;
   }
+}
+
+// Renders only the requested 1-based pages (e.g. the ones holding a matched
+// transaction) instead of streaming the whole file - used by the Settlement PDF.
+export async function renderPdfPages(buffer: Buffer, pageNos: number[], scale = 2): Promise<Map<number, Buffer>> {
+  const { pdf } = await loadPdfToImg();
+  const doc = await pdf(buffer, { scale });
+  const out = new Map<number, Buffer>();
+  for (const pageNo of pageNos) {
+    if (pageNo < 1 || pageNo > doc.length) continue;
+    out.set(pageNo, (await doc.getPage(pageNo)) as Buffer);
+  }
+  return out;
 }

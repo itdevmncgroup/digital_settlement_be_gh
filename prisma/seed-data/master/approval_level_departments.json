@@ -1,0 +1,212 @@
+[
+ {
+  "id": "13091bdd-0cb1-483f-8785-28128206d1a1",
+  "approvalLevelId": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "createdAt": "2026-10-07T12:08:04.655Z"
+ },
+ {
+  "id": "1554d84f-e013-4568-bfa7-4d3463175737",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "232861f0-3d66-4688-af92-a97964fae61c",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "31f55998-fdfa-44a3-a7e6-6bd0c1cdc17b",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ },
+ {
+  "id": "3b2ea294-bbce-46b7-b611-a49ab79254aa",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "3c1fa0e8-dc79-4d77-bc4f-4a024e0e1173",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ },
+ {
+  "id": "42c78d71-cccb-41f1-a1ef-65299a2e1c4e",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "createdAt": "2026-09-15T08:01:05.291Z"
+ },
+ {
+  "id": "45dd6ec0-f0ae-4d6c-a033-154d64555fd7",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "createdAt": "2026-09-15T08:01:05.291Z"
+ },
+ {
+  "id": "48e4f189-2483-4d20-9082-de5ac351b7f9",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ },
+ {
+  "id": "6264af29-50f9-4968-b7aa-78db0b7a4e60",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ },
+ {
+  "id": "663589b1-041a-4552-a14a-78bb5ca88e2b",
+  "approvalLevelId": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "createdAt": "2026-10-07T12:08:04.655Z"
+ },
+ {
+  "id": "66d76f07-c181-4599-b980-fb3f8ff7c478",
+  "approvalLevelId": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "createdAt": "2026-10-07T12:08:04.655Z"
+ },
+ {
+  "id": "76c8e875-6c64-4cdd-bf26-7755672a2149",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ },
+ {
+  "id": "7a9f8b42-8bd3-4733-8340-cab536b9c581",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ },
+ {
+  "id": "7bf9d1fd-b664-443d-877b-cecc6ad70abe",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "7eec35c6-73a3-4786-b166-7cb6b109230c",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ },
+ {
+  "id": "7f3afa4d-b0db-49c1-9fc9-c2945f16ca07",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "867a5a4b-948d-4a3e-864f-3f3a74a23b13",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "8761c852-b312-4607-85bf-e17dd98427c6",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "createdAt": "2026-09-15T08:01:05.291Z"
+ },
+ {
+  "id": "9e152f76-4e17-405c-ab4d-d4fe46b29757",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "createdAt": "2026-09-15T08:01:05.291Z"
+ },
+ {
+  "id": "b56418ba-6b82-4d93-9889-148956e5df95",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "b953b7fc-e641-402e-99a2-f60eda21a25d",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "be38285b-13f0-4dcd-8c31-7baf55c94b35",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "becd6718-e273-4312-936c-d2658bd06b8c",
+  "approvalLevelId": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "createdAt": "2026-10-07T12:08:04.655Z"
+ },
+ {
+  "id": "c849f2e5-e06e-4781-a572-544c20b047a5",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "cdedf157-5440-4377-a12d-b45f9db66808",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "createdAt": "2026-09-15T08:01:56.322Z"
+ },
+ {
+  "id": "cf4e2782-a179-4fc0-89aa-ed4885db5bde",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "d187ff38-9060-4968-b36f-8fbcf58cbcb4",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "d37ae011-4c19-4262-af43-5458eb797f26",
+  "approvalLevelId": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "createdAt": "2026-10-07T12:08:04.655Z"
+ },
+ {
+  "id": "d5fe8f7e-9d89-4f99-b470-1b81b2ada5d2",
+  "approvalLevelId": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "createdAt": "2026-10-07T12:08:04.655Z"
+ },
+ {
+  "id": "da0e551a-4966-4127-abe1-0f1d478bd35b",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "e2bde916-4937-4098-9461-b6a71e2bc9d7",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "createdAt": "2026-09-15T08:01:56.322Z"
+ },
+ {
+  "id": "ea712d33-53ea-4831-beb1-0890ca4c7bdc",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "f0c1ea39-2f92-4494-8fac-fce7a690fa7d",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "departmentId": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "createdAt": "2026-09-15T08:01:56.322Z"
+ },
+ {
+  "id": "f11d20ee-7b40-4d82-a085-102edde80566",
+  "approvalLevelId": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "createdAt": "2026-10-07T12:08:04.655Z"
+ }
+]

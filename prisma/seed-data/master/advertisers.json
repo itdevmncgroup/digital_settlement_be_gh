@@ -1,0 +1,938 @@
+[
+ {
+  "id": "004b0301-c572-4908-85b0-9def9619d537",
+  "code": "ADV0028",
+  "name": "PT Cemerlang Internasional",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "03a16d86-e6f4-4cf3-9357-793fdd15c540",
+  "code": "ADV0078",
+  "name": "PT Bahagia Internasional",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "04ad5987-0c75-4f2c-a543-85229e3b01e3",
+  "code": "ADV0079",
+  "name": "PT Bahagia Persada",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "0804e50d-12b1-4634-9f70-81241fa68cf2",
+  "code": "ADV0075",
+  "name": "PT Bahagia Sejati",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "0bcb2eb3-34dc-4451-8f1b-94c1ebbfef21",
+  "code": "ADV0065",
+  "name": "PT Utama Sejati",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "0d8cd3ad-7ae8-40a3-964f-a7c64878bcd3",
+  "code": "ADV0033",
+  "name": "PT Abadi Industri",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "113d5c5b-2692-48c8-82a6-db5ee93e9704",
+  "code": "ADV0029",
+  "name": "PT Cemerlang Persada",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "149daca0-5013-4783-8a4f-8acce746c4cf",
+  "code": "ADV0071",
+  "name": "PT Bahagia Group",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "192da876-5c77-4e22-ab48-8905a21fdd8a",
+  "code": "ADV0087",
+  "name": "PT Sentosa Bersaudara",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "192eb689-a0f9-495f-a6b9-f012388add1f",
+  "code": "ADV0091",
+  "name": "PT Kencana Group",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "1f887dd4-818b-4076-a89c-3c057cefaed7",
+  "code": "ADV0001",
+  "name": "PT Sinar Group",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "205ceafb-9dc8-41a9-9f58-fc8f9f953d10",
+  "code": "ADV0032",
+  "name": "PT Abadi Corpora",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "2156e85e-2faf-4406-b1b0-f32d6404ccbe",
+  "code": "ADV0040",
+  "name": "PT Abadi Utama Jaya",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "28c1a108-ef7f-4229-b280-0218e30c3648",
+  "code": "ADV0038",
+  "name": "PT Abadi Internasional",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "28e28fa2-a039-49a8-a379-9fd91e4be228",
+  "code": "ADV0019",
+  "name": "PT Nusantara Persada",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "315517fa-ecd2-4a42-9377-cf6abb44a691",
+  "code": "ADV0077",
+  "name": "PT Bahagia Bersaudara",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "3282058c-d12b-4be0-a3ca-3f1420d92cf7",
+  "code": "ADV0039",
+  "name": "PT Abadi Persada",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "3331b8a9-0344-4345-ac18-cdcb1ee2c56f",
+  "code": "ADV0069",
+  "name": "PT Utama Persada",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "341ef0e3-68b6-4459-b6c1-7c2f80d10567",
+  "code": "ADV0006",
+  "name": "PT Sinar Mulia",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "36ee2d74-1116-4dd0-b783-c20a830ced95",
+  "code": "ADV0058",
+  "name": "PT Sejahtera Internasional",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "37338774-4f02-4109-bc71-920e2829b3ca",
+  "code": "ADV0035",
+  "name": "PT Abadi Sejati",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "3b32d90b-e28a-4ec5-b499-7eb4ce18cd32",
+  "code": "ADV0043",
+  "name": "PT Mandiri Industri",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "3bf7f8c0-fb3c-4153-9646-ab3e38a24194",
+  "code": "ADV0070",
+  "name": "PT Utama Utama Jaya",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "3c450b0d-8938-4ba1-b0c8-092c62b4c022",
+  "code": "ADV0007",
+  "name": "PT Sinar Bersaudara",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "3eb89d31-98eb-4fd9-8948-7db33bd5dc9d",
+  "code": "ADV0059",
+  "name": "PT Sejahtera Persada",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "40cf934b-f564-477c-ba4e-b9828799b9fb",
+  "code": "ADV0025",
+  "name": "PT Cemerlang Sejati",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "426bef0c-2893-4fa7-9f46-34670af5b976",
+  "code": "ADV0056",
+  "name": "PT Sejahtera Mulia",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "46d47e46-2d69-4cf1-8f41-6ba471075203",
+  "code": "ADV0041",
+  "name": "PT Mandiri Group",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "491f5637-f043-4506-85ca-aca01fb1a573",
+  "code": "ADV0080",
+  "name": "PT Bahagia Utama Jaya",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "49e636ff-941f-4915-b45b-1d9161013ea3",
+  "code": "ADV0062",
+  "name": "PT Utama Corpora",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "4dd434c3-c4b4-4d44-a5cd-8e6a58967ea8",
+  "code": "ADV0008",
+  "name": "PT Sinar Internasional",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "521ca65d-50f1-44fd-94a9-8429a6d03810",
+  "code": "ADV0098",
+  "name": "PT Kencana Internasional",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "52d91456-1cf6-477c-a18a-9ce618e9c14f",
+  "code": "ADV0061",
+  "name": "PT Utama Group",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "5364dd64-2fc8-44e4-aed4-192074f8e3cb",
+  "code": "ADV0064",
+  "name": "PT Utama Perkasa",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "54b72296-d488-4c5f-9497-7ef6e0022c14",
+  "code": "ADV0036",
+  "name": "PT Abadi Mulia",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "59755413-121d-4a0c-94b7-7b8c8bca7f7a",
+  "code": "ADV0073",
+  "name": "PT Bahagia Industri",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "5a808315-d909-424e-afaf-f65ab3f8219e",
+  "code": "ADV0048",
+  "name": "PT Mandiri Internasional",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "5c069e9d-679f-4202-a2e3-26ab7385bd8a",
+  "code": "ADV0018",
+  "name": "PT Nusantara Internasional",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "61dd1763-702c-4904-bd36-4975644f6196",
+  "code": "ADV0020",
+  "name": "PT Nusantara Utama Jaya",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "63fa3c6b-577b-4ec1-b8a7-f54e87fc400f",
+  "code": "ADV0013",
+  "name": "PT Nusantara Industri",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "65615fde-9fe6-48c3-90fb-07469b83ecd0",
+  "code": "ADV0011",
+  "name": "PT Nusantara Group",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "69d08db2-e946-4cca-830e-d21d4b3c42c7",
+  "code": "ADV0063",
+  "name": "PT Utama Industri",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "6d681d47-6078-42df-baa5-e9b69af4ce54",
+  "code": "ADV0030",
+  "name": "PT Cemerlang Utama Jaya",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "6f4e42dc-0a7e-46ce-b98e-c523864814c9",
+  "code": "ADV0081",
+  "name": "PT Sentosa Group",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "705c03c0-d988-437d-a735-6162d5a89473",
+  "code": "ADV0023",
+  "name": "PT Cemerlang Industri",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "777f3f21-0153-4c88-a897-77714b26ffe3",
+  "code": "ADV0047",
+  "name": "PT Mandiri Bersaudara",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "78b619b6-29ad-47ba-a387-2f312ae69aac",
+  "code": "ADV0037",
+  "name": "PT Abadi Bersaudara",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "791d3c6e-6ecc-41b1-993f-7c47aaf4e544",
+  "code": "ADV0096",
+  "name": "PT Kencana Mulia",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "79b3668c-3884-4a5c-bb41-96a479c0a715",
+  "code": "ADV0068",
+  "name": "PT Utama Internasional",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "7eba4f66-7398-4e1a-aaad-004174ddd6ed",
+  "code": "ADV0051",
+  "name": "PT Sejahtera Group",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "8046c36a-00d1-4986-83cf-c4c33d3f91e6",
+  "code": "ADV0057",
+  "name": "PT Sejahtera Bersaudara",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "80caf120-2f24-49c2-b9a9-4a4a13e296d4",
+  "code": "ADV0016",
+  "name": "PT Nusantara Mulia",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "84457981-5171-4a48-9120-ea42c92503ed",
+  "code": "ADV0014",
+  "name": "PT Nusantara Perkasa",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "8b8973e1-4d5e-4f3c-ad15-8923cd7f08e1",
+  "code": "NESTLE",
+  "name": "PT Nestle Indonesia",
+  "agencyId": "7826db74-3e9b-4a2f-9eaf-eb9d0f5f8ce5",
+  "createdAt": "2026-09-07T10:52:37.817Z",
+  "updatedAt": "2026-09-07T10:52:37.817Z",
+  "isActive": true
+ },
+ {
+  "id": "8dfba790-3e3a-4a8b-9296-42f06e6bcfce",
+  "code": "ADV0088",
+  "name": "PT Sentosa Internasional",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "92e32a9b-745b-4192-8fa5-74b58aaf3e62",
+  "code": "ADV0072",
+  "name": "PT Bahagia Corpora",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "982b8ce9-aba5-4dbf-a323-f75ed3990253",
+  "code": "UNVR",
+  "name": "PT Unilever Indonesia",
+  "agencyId": "7826db74-3e9b-4a2f-9eaf-eb9d0f5f8ce5",
+  "createdAt": "2026-09-07T10:52:37.816Z",
+  "updatedAt": "2026-09-07T10:52:37.816Z",
+  "isActive": true
+ },
+ {
+  "id": "99a2d072-d0cd-4c75-9551-1e05fa90cfb3",
+  "code": "ADV0092",
+  "name": "PT Kencana Corpora",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "9dd3711e-3295-4285-9057-4d132aa8a7f3",
+  "code": "ADV0095",
+  "name": "PT Kencana Sejati",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "9fb51c8d-62e8-417f-9c24-7d2513c68c2d",
+  "code": "ADV0060",
+  "name": "PT Sejahtera Utama Jaya",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "a1728ab4-7162-42f7-89fb-0bda9cf31f3c",
+  "code": "ADV0066",
+  "name": "PT Utama Mulia",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "a7623569-c055-4688-8d13-269f8e2fd776",
+  "code": "ADV0044",
+  "name": "PT Mandiri Perkasa",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "a7e23a14-5271-4649-a17a-14d037d925ca",
+  "code": "ADV0004",
+  "name": "PT Sinar Perkasa",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "a9a1d585-fef5-4593-88c4-b46cf38f0ff0",
+  "code": "ADV0017",
+  "name": "PT Nusantara Bersaudara",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "ac829fdf-772e-42c9-88f5-106df6c5ac04",
+  "code": "ADV0090",
+  "name": "PT Sentosa Utama Jaya",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "ad21f542-0643-4b18-8629-02fbc2edee02",
+  "code": "ADV0046",
+  "name": "PT Mandiri Mulia",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "b1bea00a-ec59-45a6-8a1b-310a86936f49",
+  "code": "ADV0099",
+  "name": "PT Kencana Persada",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "b2b11698-0c27-4aab-b00d-c7864223a43e",
+  "code": "ADV0015",
+  "name": "PT Nusantara Sejati",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "b3b3c101-e54b-4127-b843-111e2e980a39",
+  "code": "ADV0045",
+  "name": "PT Mandiri Sejati",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "b50679ed-e448-4d08-b0d5-ba39ce889789",
+  "code": "ADV0022",
+  "name": "PT Cemerlang Corpora",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "ba3f60bc-e5cf-469d-b22d-b165a618d16c",
+  "code": "ADV0042",
+  "name": "PT Mandiri Corpora",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "ba600f86-73f2-48a8-885d-70d1fb3d83a5",
+  "code": "ADV0026",
+  "name": "PT Cemerlang Mulia",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "babcc39e-76d7-4489-8774-87d8b5212c19",
+  "code": "ADV0082",
+  "name": "PT Sentosa Corpora",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "bc26fde0-6dcb-4a9d-886a-273b3bd2ac0c",
+  "code": "ADV0086",
+  "name": "PT Sentosa Mulia",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "bc43ed5f-0c91-4012-af26-34e6d53920e0",
+  "code": "ADV0031",
+  "name": "PT Abadi Group",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "bcc4f74c-c56d-4d72-8127-9c2b9d63b9ad",
+  "code": "ADV0084",
+  "name": "PT Sentosa Perkasa",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "c225f52f-7074-4bc3-997c-7cf0902ace01",
+  "code": "ADV0024",
+  "name": "PT Cemerlang Perkasa",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "c35aee87-74e1-4e48-a980-05b95c6fcce1",
+  "code": "ADV0053",
+  "name": "PT Sejahtera Industri",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "c35eb50e-ac29-4508-abaa-6ca0b0ea60a2",
+  "code": "ADV0027",
+  "name": "PT Cemerlang Bersaudara",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "caf0ef41-9944-4cf4-8854-4c586da6a596",
+  "code": "MYOR",
+  "name": "PT Mayora Indah",
+  "agencyId": "a194348a-f781-4cf8-bc87-2f5fb1e19e13",
+  "createdAt": "2026-09-07T10:52:37.817Z",
+  "updatedAt": "2026-09-07T10:52:37.817Z",
+  "isActive": true
+ },
+ {
+  "id": "cb38aa19-d1e9-4e5e-b70f-1d6d23367da4",
+  "code": "ADV0021",
+  "name": "PT Cemerlang Group",
+  "agencyId": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "cc981735-f496-41b3-8e89-e1b38afa1f86",
+  "code": "INDF",
+  "name": "PT Indofood Sukses Makmur",
+  "agencyId": "a194348a-f781-4cf8-bc87-2f5fb1e19e13",
+  "createdAt": "2026-09-07T10:52:37.817Z",
+  "updatedAt": "2026-09-07T10:52:37.817Z",
+  "isActive": true
+ },
+ {
+  "id": "cf29ba7d-e45c-4d37-b812-987bf23b9dfe",
+  "code": "ADV0076",
+  "name": "PT Bahagia Mulia",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "db3ae2dd-1b17-4b70-a84c-d0a2e25b0db3",
+  "code": "ADV0034",
+  "name": "PT Abadi Perkasa",
+  "agencyId": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "dc28d36d-eae2-4ce9-aa39-3dd54fb7c895",
+  "code": "ADV0049",
+  "name": "PT Mandiri Persada",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "de7d0883-e9fa-4bf1-96ac-f8a8b9ad447d",
+  "code": "ADV0050",
+  "name": "PT Mandiri Utama Jaya",
+  "agencyId": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "e02c4251-76de-4704-a2e9-50b4de7324a8",
+  "code": "ADV0002",
+  "name": "PT Sinar Corpora",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "e33629c7-19f0-4a7e-9f7d-c5183c5ffd1d",
+  "code": "ADV0005",
+  "name": "PT Sinar Sejati",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "e71455cf-9f68-40f7-8831-525ed8ca364d",
+  "code": "ADV0083",
+  "name": "PT Sentosa Industri",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "e7bba15b-9bd5-4a76-8313-1ae0c35dd97a",
+  "code": "ADV0067",
+  "name": "PT Utama Bersaudara",
+  "agencyId": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "e9079de3-d47a-46ce-a2ee-74cca709cd56",
+  "code": "ADV0093",
+  "name": "PT Kencana Industri",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "e913d1dd-4a99-472b-bab3-b92d2ffbec62",
+  "code": "ADV0010",
+  "name": "PT Sinar Utama Jaya",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "ec6595e0-a0c7-48dd-ad1d-b51fc24cacd1",
+  "code": "ADV0003",
+  "name": "PT Sinar Industri",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "ee07a465-56b6-4a50-bbbe-d67488267208",
+  "code": "ADV0012",
+  "name": "PT Nusantara Corpora",
+  "agencyId": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "eec241dd-82a2-405b-9e91-11db666a857f",
+  "code": "ADV0089",
+  "name": "PT Sentosa Persada",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "f809c585-9353-48af-8416-d442141d5df7",
+  "code": "ADV0055",
+  "name": "PT Sejahtera Sejati",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "f83d804d-a586-45a5-9e80-c1f7f043eea7",
+  "code": "ADV0074",
+  "name": "PT Bahagia Perkasa",
+  "agencyId": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "f9241c44-6085-4a9e-9f46-de09a89d904d",
+  "code": "ADV0085",
+  "name": "PT Sentosa Sejati",
+  "agencyId": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "f9cf7499-3ac9-45b6-9bf5-8e8e0cebed5c",
+  "code": "ADV0009",
+  "name": "PT Sinar Persada",
+  "agencyId": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "f9ef11ba-2f99-452e-9415-ab55e38dd57c",
+  "code": "ADV0094",
+  "name": "PT Kencana Perkasa",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "fa86a80e-b62d-4b26-975c-5176762901d9",
+  "code": "ADV0052",
+  "name": "PT Sejahtera Corpora",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "fbe03759-6443-4277-ab35-d8084f3ed260",
+  "code": "ADV0054",
+  "name": "PT Sejahtera Perkasa",
+  "agencyId": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "fe25effd-1389-40aa-8eed-c48fcff86977",
+  "code": "ADV0097",
+  "name": "PT Kencana Bersaudara",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ },
+ {
+  "id": "ff149788-e175-480d-aa60-eb14a1b800c8",
+  "code": "ADV0100",
+  "name": "PT Kencana Utama Jaya",
+  "agencyId": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "createdAt": "2026-09-07T10:52:38.491Z",
+  "updatedAt": "2026-09-07T10:52:38.491Z",
+  "isActive": true
+ }
+]

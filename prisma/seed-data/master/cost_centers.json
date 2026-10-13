@@ -1,0 +1,16 @@
+[
+ {
+  "id": "6d8dd9ae-9a66-47c9-8cac-385b5c448bf2",
+  "code": "CC-SALES",
+  "name": "Sales & Marketing",
+  "createdAt": "2026-09-07T10:52:38.156Z",
+  "isActive": true
+ },
+ {
+  "id": "cf2efbc2-6dcc-4a4e-9cd5-25f39cf7e4ab",
+  "code": "CC-OPS",
+  "name": "Operations",
+  "createdAt": "2026-09-07T10:52:38.156Z",
+  "isActive": true
+ }
+]

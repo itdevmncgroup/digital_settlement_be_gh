@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ExpenseStatus" ADD VALUE 'PENDING_SALES_ADMIN';

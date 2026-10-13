@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { canAccessExpenseOwnedRecord, canUploadExpenseFiles } from '../common/rbac/scope.util';
+import { canAccessExpenseOwnedRecord, canCompletePendingSalesAdmin, canUploadExpenseFiles } from '../common/rbac/scope.util';
 import { CreateInvoiceDto, UpdateInvoiceDto } from './dto/invoice.dto';
 
 const include = { merchant: true, files: true, modifiedBy: { select: { id: true, name: true } } } as const;
@@ -16,6 +16,7 @@ const include = { merchant: true, files: true, modifiedBy: { select: { id: true,
 // LOCKED_STATUSES gate, on top of the original DRAFT/REJECTED/REVISION set.
 const EDITABLE_STATUSES: ExpenseStatus[] = [
   ExpenseStatus.DRAFT,
+  ExpenseStatus.PENDING_SALES_ADMIN,
   ExpenseStatus.REJECTED,
   ExpenseStatus.REVISION,
   ExpenseStatus.PROCESSING,
@@ -47,10 +48,10 @@ export class InvoicesService {
   async findOne(id: string, actor: AuthUser) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
-      include: { ...include, expense: { select: { id: true, expenseNo: true, salesId: true, departmentId: true } } },
+      include: { ...include, expense: { select: { id: true, expenseNo: true, salesId: true, createdById: true, departmentId: true } } },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    await this.assertCanAccess(invoice.expense, actor);
+    await this.assertCanAccess({ ...invoice.expense, expenseId: invoice.expense.id }, actor);
     return invoice;
   }
 
@@ -148,10 +149,10 @@ export class InvoicesService {
   async getFileForDownload(fileId: string, actor: AuthUser) {
     const file = await this.prisma.invoiceFile.findUnique({
       where: { id: fileId },
-      include: { invoice: { include: { expense: { select: { salesId: true, departmentId: true } } } } },
+      include: { invoice: { include: { expense: { select: { salesId: true, createdById: true, departmentId: true } } } } },
     });
     if (!file) throw new NotFoundException('File not found');
-    await this.assertCanAccess(file.invoice.expense, actor);
+    await this.assertCanAccess({ ...file.invoice.expense, expenseId: file.invoice.expenseId }, actor);
 
     await this.audit.log({ userId: actor.userId, action: 'DOWNLOAD', objectType: 'InvoiceFile', objectId: file.id });
 
@@ -159,7 +160,7 @@ export class InvoicesService {
     return { buffer, fileName: file.fileName, mimeType: file.mimeType };
   }
 
-  private async assertCanAccess(owner: { salesId: string; departmentId?: string | null }, actor: AuthUser) {
+  private async assertCanAccess(owner: { expenseId: string; salesId: string; createdById?: string | null; departmentId?: string | null }, actor: AuthUser) {
     if (!(await canAccessExpenseOwnedRecord(this.prisma, actor, owner))) {
       throw new ForbiddenException('Not authorized to access this invoice');
     }
@@ -168,10 +169,12 @@ export class InvoicesService {
   private async getEditableExpenseOrThrow(expenseId: string, actorId: string, actorRoles: string[] = [], actorPermissions: string[] = []) {
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
     if (!expense) throw new NotFoundException('Expense not found');
-    if (expense.salesId !== actorId && !this.isBackOffice(actorRoles)) {
+    // A PENDING_SALES_ADMIN Expense (raised by Corsec) is completed by a Sales Admin of its Department.
+    const completesPending = await canCompletePendingSalesAdmin(this.prisma, { userId: actorId, roles: actorRoles }, expense);
+    if (expense.salesId !== actorId && expense.createdById !== actorId && !this.isBackOffice(actorRoles) && !completesPending) {
       throw new ForbiddenException('Not owner of this expense');
     }
-    if (!canUploadExpenseFiles(expense, { userId: actorId, roles: actorRoles, permissions: actorPermissions })) {
+    if (!completesPending && !canUploadExpenseFiles(expense, { userId: actorId, roles: actorRoles, permissions: actorPermissions })) {
       throw new ForbiddenException('Changing invoices requires edit permission on this expense');
     }
     if (!EDITABLE_STATUSES.includes(expense.status)) {

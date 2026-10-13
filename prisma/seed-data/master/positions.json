@@ -1,0 +1,114 @@
+[
+ {
+  "id": "15516908-cb9d-49d8-9ba2-904621220ced",
+  "code": "SLS-PARTNER",
+  "name": "Sales Partner",
+  "createdAt": "2026-10-07T12:18:12.717Z",
+  "updatedAt": "2026-10-07T13:32:39.464Z",
+  "isActive": true
+ },
+ {
+  "id": "2643edde-9188-4e32-9e49-16d2b71dd763",
+  "code": "SLS-MAR-DIR",
+  "name": "Sales & Marketing Director (Ads) MNC Media",
+  "createdAt": "2026-09-08T10:12:18.309Z",
+  "updatedAt": "2026-10-07T13:32:39.449Z",
+  "isActive": true
+ },
+ {
+  "id": "282ec271-7bad-4550-bdc4-ab08eef124a4",
+  "code": "SLSADM",
+  "name": "Sales Admin",
+  "createdAt": "2026-09-07T10:59:20.962Z",
+  "updatedAt": "2026-10-07T13:32:39.446Z",
+  "isActive": true
+ },
+ {
+  "id": "2f78f093-b3de-4c9f-89b2-a3d04223affa",
+  "code": "CO-CFO-3TV",
+  "name": "Co-Chief Finance Officer 3FTA",
+  "createdAt": "2026-09-08T10:13:11.582Z",
+  "updatedAt": "2026-10-07T13:32:39.454Z",
+  "isActive": true
+ },
+ {
+  "id": "3d5b32c9-5ecd-4714-b859-9c25d2dcb46b",
+  "code": "SLS",
+  "name": "Sales",
+  "createdAt": "2026-09-07T10:59:12.921Z",
+  "updatedAt": "2026-10-07T13:32:39.432Z",
+  "isActive": true
+ },
+ {
+  "id": "406570a7-8de4-4d2e-a219-6351d6358099",
+  "code": "STAFF",
+  "name": "Staff",
+  "createdAt": "2026-10-07T12:09:20.607Z",
+  "updatedAt": "2026-10-07T13:32:39.462Z",
+  "isActive": true
+ },
+ {
+  "id": "49a339ba-323b-4476-b551-95a828eb2017",
+  "code": "CORSEC",
+  "name": "Corporate Secretary (Corsec)",
+  "createdAt": "2026-10-07T10:33:53.767Z",
+  "updatedAt": "2026-10-07T13:32:39.460Z",
+  "isActive": true
+ },
+ {
+  "id": "77b4e457-46cb-40fa-9062-157b3dcfdf03",
+  "code": "ADMIN",
+  "name": "Administrator",
+  "createdAt": "2026-09-07T10:52:37.273Z",
+  "updatedAt": "2026-09-14T13:38:30.772Z",
+  "isActive": true
+ },
+ {
+  "id": "77b4e457-46cb-40fa-9062-157b3dcfdf04",
+  "code": "HEAD-POD",
+  "name": "Head POD",
+  "createdAt": "2026-09-07T10:52:37.273Z",
+  "updatedAt": "2026-10-07T13:32:39.440Z",
+  "isActive": true
+ },
+ {
+  "id": "7ede027b-12d0-4926-a002-2ca4fc948d2a",
+  "code": "DEPT-HEAD",
+  "name": "Department Head",
+  "createdAt": "2026-10-07T11:56:16.400Z",
+  "updatedAt": "2026-10-07T13:32:39.467Z",
+  "isActive": true
+ },
+ {
+  "id": "84b6df8e-7392-4f2f-b080-70c7eec7dd38",
+  "code": "VP-ACC-BIL-TAX-3TV",
+  "name": "VP Accounting, Billing & Tax 3TV",
+  "createdAt": "2026-09-08T10:12:45.532Z",
+  "updatedAt": "2026-10-07T13:32:39.451Z",
+  "isActive": true
+ },
+ {
+  "id": "91b7e7c3-85f2-46de-9d6b-edef76564df0",
+  "code": "DIV-HEAD",
+  "name": "Division Head",
+  "createdAt": "2026-10-07T10:33:53.760Z",
+  "updatedAt": "2026-10-07T13:32:39.456Z",
+  "isActive": true
+ },
+ {
+  "id": "c4f5bc14-7b8a-462c-a025-cdb8bce02f57",
+  "code": "SLS-CS",
+  "name": "Sales Customer Service",
+  "createdAt": "2026-10-07T10:33:53.764Z",
+  "updatedAt": "2026-10-07T13:32:39.458Z",
+  "isActive": true
+ },
+ {
+  "id": "d8451cc8-f7c8-461f-9808-1cf3d3aa92c7",
+  "code": "CO-CSO",
+  "name": "Co-Chief Sales Officer (Ads) MNC Media",
+  "createdAt": "2026-10-07T10:33:53.735Z",
+  "updatedAt": "2026-10-07T13:32:39.443Z",
+  "isActive": true
+ }
+]

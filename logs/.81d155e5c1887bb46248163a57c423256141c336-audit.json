@@ -39,6 +39,61 @@
             "date": 1790566617821,
             "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-09-28.log",
             "hash": "aa56913d597bd33d0a7448e4faf0920a9aff3d576e460cf46a5ef362b9ed9542"
+        },
+        {
+            "date": 1790739832478,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-09-30.log",
+            "hash": "86ed5a76241136e6be2f7ce29ca53019738add7eefc9b38016543d1b2002d6d6"
+        },
+        {
+            "date": 1790818641882,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-01.log",
+            "hash": "f5ef5ab8bff8b87d39015bf29d55cf8e314a49e1998fb2c2d9d1fbe550996f66"
+        },
+        {
+            "date": 1790905671076,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-02.log",
+            "hash": "723b6750b5adbc338f2e479f725a27ac2fb76bec988329a589598b5323c87d34"
+        },
+        {
+            "date": 1790980684514,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-03.log",
+            "hash": "544c2982bc5e25a8c6c1c2e748a91d17fcdf100d6b21690f193eb654edf28bca"
+        },
+        {
+            "date": 1791169728685,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-05.log",
+            "hash": "6432b32695c1034f00a17a8ed239b403c52ebccb0a9095779baeb4a2afdf1106"
+        },
+        {
+            "date": 1791252091988,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-06.log",
+            "hash": "924d156c86d879aa95a06bfae14bf1230f34b22402a97fe4e61cf5e7e828ddc8"
+        },
+        {
+            "date": 1791341639874,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-07.log",
+            "hash": "cb64ccd392ccf1e8d785b4fccb14b13298f04f5068c238f5e9ce72449a7ac2df"
+        },
+        {
+            "date": 1791424086642,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-08.log",
+            "hash": "8857e94ede13e5fc692709dae9f58c65600208553251310713d64404748b95e6"
+        },
+        {
+            "date": 1791510430758,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-09.log",
+            "hash": "f4791bdf11c5401f82ccedb9c0afa436a22412413b2fd76929fb6bab5cca5f9a"
+        },
+        {
+            "date": 1791770905946,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-12.log",
+            "hash": "45ef104b2eb8282edbe26f6eb7411bd2f1a669011f434f1c7dc74068b519cc94"
+        },
+        {
+            "date": 1791856635783,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\app-2026-10-13.log",
+            "hash": "115ac6f9ab9391c56bfa370dc2253bad7c7326c6a989f32e9b1476ba79ed4329"
         }
     ],
     "hashType": "sha256"

@@ -62,6 +62,15 @@ export class CreateExpenseDto {
   @IsString()
   departmentId?: string;
 
+  // Corsec only: raise this Expense from an APPROVED Expense Request. Date,
+  // Department, Sales (= the Request's requester), Activity Type, Agency/
+  // Advertiser/Brand are taken from the Request (anything sent for them is
+  // ignored) and the Expense lands in PENDING_SALES_ADMIN. See
+  // ExpensesService.createFromExpenseRequest.
+  @IsOptional()
+  @IsString()
+  expenseRequestId?: string;
+
   // Sales can park an Expense as a DRAFT (still theirs to edit, not yet visible
   // to any approver) instead of submitting it straight into the approval chain.
   // See ExpensesService.create/submitDraft.
@@ -152,6 +161,28 @@ export class CreateExpenseDto {
 }
 
 export class UpdateExpenseDto {
+  // Core fields below are only honoured while the Expense is still a DRAFT
+  // (ExpensesService.update ignores them in any other status).
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  unitId?: string;
+
+  @IsOptional()
+  @IsString()
+  activityTypeId?: string;
+
+  @IsOptional()
+  @IsString()
+  advertiserId?: string;
+
+  @IsOptional()
+  @IsString()
+  brandId?: string;
+
   @IsOptional()
   @IsString()
   costCenterId?: string;

@@ -1,0 +1,14 @@
+[
+ {
+  "id": "1886dc4a-ea70-4980-80a8-fef4f241370c",
+  "approvalLevelId": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "positionId": "d8451cc8-f7c8-461f-9808-1cf3d3aa92c7",
+  "createdAt": "2026-09-15T08:01:05.291Z"
+ },
+ {
+  "id": "768626fa-994c-45c3-92ad-a419fb7e1eb4",
+  "approvalLevelId": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "positionId": "3d5b32c9-5ecd-4714-b859-9c25d2dcb46b",
+  "createdAt": "2026-09-15T10:43:21.976Z"
+ }
+]

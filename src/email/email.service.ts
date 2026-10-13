@@ -6,7 +6,7 @@ export interface ApprovalEmailParams {
   to: string;
   approverName: string;
   positionName: string;
-  documentStage: 'PRE_EVENT' | 'EXPENSES' | 'SETTLEMENT';
+  documentStage: 'PRE_EVENT' | 'EXPENSES' | 'SETTLEMENT' | 'EXPENSE_REQUEST';
   docNo: string;
   salesName: string;
   purpose: string;
@@ -49,7 +49,7 @@ export class EmailService {
   }
 
   async sendApprovalRequest(params: ApprovalEmailParams): Promise<void> {
-    const stageLabel = params.documentStage === 'PRE_EVENT' ? 'Pre-Event' : params.documentStage === 'EXPENSES' ? 'Expenses' : 'Settlement';
+    const stageLabel = params.documentStage === 'PRE_EVENT' ? 'Pre-Event' : params.documentStage === 'EXPENSES' ? 'Expenses' : params.documentStage === 'EXPENSE_REQUEST' ? 'Expense Request' : 'Settlement';
     const subject = `Approval needed: ${params.docNo} - ${params.positionName} (${stageLabel})`;
     const html = `
       <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;color:#1a1d23;max-width:520px">

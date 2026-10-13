@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, Get, NotFoundException, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, Get, NotFoundException, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
+import { deleteRecord } from '../common/delete.util';
 import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 import { CreatePermissionDto, UpdatePermissionDto } from './dto/permission.dto';
 
@@ -55,6 +56,24 @@ export class RolesController {
     return role;
   }
 
+  // The 4 RoleName built-ins are wired to @Roles guards across the API - deleting one would
+  // lock those features out, so they can only be edited/deactivated. A custom Role still held
+  // by Users can't be deleted either (the cascade would silently strip those Users' access).
+  @Delete('roles/:id')
+  async deleteRole(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    const before = await this.prisma.role.findUnique({ where: { id }, include: { _count: { select: { users: true } } } });
+    if (!before) throw new NotFoundException('Role not found');
+    if ((Object.values(RoleName) as string[]).includes(before.name)) {
+      throw new ConflictException(`"${before.name}" is a built-in role and cannot be deleted.`);
+    }
+    if (before._count.users > 0) {
+      throw new ConflictException(`Role "${before.name}" is still assigned to ${before._count.users} user(s). Unassign it first, or deactivate it instead.`);
+    }
+    await deleteRecord('Role', () => this.prisma.role.delete({ where: { id } }));
+    await this.audit.log({ userId: actor.userId, action: 'DELETE', objectType: 'Role', objectId: id, oldValue: before });
+    return { id };
+  }
+
   @Get('permissions')
   findPermissions() {
     return this.prisma.permission.findMany({ orderBy: { code: 'asc' } });
@@ -86,6 +105,25 @@ export class RolesController {
     });
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', objectType: 'Permission', objectId: id, oldValue: before, newValue: permission });
     return permission;
+  }
+
+  // Administrator holds every Permission (see seed), so only grants to other Roles block deletion.
+  @Delete('permissions/:id')
+  async deletePermission(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    const before = await this.prisma.permission.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException('Permission not found');
+    const grantedTo = await this.prisma.rolePermission.findMany({
+      where: { permissionId: id, role: { name: { not: RoleName.ADMIN } } },
+      select: { role: { select: { name: true } } },
+    });
+    if (grantedTo.length > 0) {
+      throw new ConflictException(
+        `Permission "${before.code}" is still granted to: ${grantedTo.map((g) => g.role.name).join(', ')}. Revoke it there first, or deactivate it instead.`,
+      );
+    }
+    await deleteRecord('Permission', () => this.prisma.permission.delete({ where: { id } }));
+    await this.audit.log({ userId: actor.userId, action: 'DELETE', objectType: 'Permission', objectId: id, oldValue: before });
+    return { id };
   }
 
   @Post('roles/:id/permissions')

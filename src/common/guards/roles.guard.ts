@@ -43,10 +43,12 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const reasons = [
-      hasRoleGate ? `role in [${requiredRoles!.join(', ')}]` : null,
-      hasPermissionGate ? `permission in [${requiredPermissions!.join(', ')}]` : null,
-    ].filter(Boolean);
-    throw new ForbiddenException(`Requires ${reasons.join(' or ')}`);
+    // When a permission alternative exists, surface that in the error instead of
+    // the hardcoded role list - permissions are grantable via the Role/Permission
+    // master, raw role names are not actionable for the user.
+    if (hasPermissionGate) {
+      throw new ForbiddenException(`Requires permission [${requiredPermissions!.join(', ')}]`);
+    }
+    throw new ForbiddenException(`Requires role in [${requiredRoles!.join(', ')}]`);
   }
 }

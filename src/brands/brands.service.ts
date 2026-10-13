@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { deleteRecord } from '../common/delete.util';
 import { codeNameWhere } from '../common/search.util';
 import { CreateBrandDto, UpdateBrandDto } from './dto/brand.dto';
 
@@ -56,5 +57,12 @@ export class BrandsService {
     const item = await this.prisma.brand.update({ where: { id }, data: dto, include: { advertiser: { include: { agency: true } } } });
     await this.audit.log({ userId: actorId, action: 'UPDATE', objectType: 'Brand', objectId: id, oldValue: before, newValue: item });
     return item;
+  }
+
+  async remove(id: string, actorId: string) {
+    const before = await this.findOne(id);
+    await deleteRecord('Brand', () => this.prisma.brand.delete({ where: { id } }));
+    await this.audit.log({ userId: actorId, action: 'DELETE', objectType: 'Brand', objectId: id, oldValue: before });
+    return { id };
   }
 }

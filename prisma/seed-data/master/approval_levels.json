@@ -1,0 +1,57 @@
+[
+ {
+  "id": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "name": "Expense Request - Karangan Bunga",
+  "documentStage": "EXPENSE_REQUEST",
+  "scopeType": "DEPARTMENT",
+  "minAmount": "0",
+  "maxAmount": null,
+  "isActive": true,
+  "createdAt": "2026-10-08T09:32:22.991Z",
+  "updatedAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "7109d517-4410-4b04-9d64-2274f0fb0f80",
+  "name": "Expense From Sales",
+  "documentStage": "EXPENSES",
+  "scopeType": "DEPARTMENT",
+  "minAmount": "0",
+  "maxAmount": null,
+  "isActive": true,
+  "createdAt": "2026-09-08T04:05:14.038Z",
+  "updatedAt": "2026-09-15T10:43:21.976Z"
+ },
+ {
+  "id": "a7b6d445-00eb-49c6-bef2-1c517bfbb3b2",
+  "name": "Settlement - All",
+  "documentStage": "SETTLEMENT",
+  "scopeType": "DEPARTMENT",
+  "minAmount": "0",
+  "maxAmount": null,
+  "isActive": true,
+  "createdAt": "2026-09-09T02:43:12.385Z",
+  "updatedAt": "2026-10-07T12:08:04.655Z"
+ },
+ {
+  "id": "f0e1f455-6cc2-44e3-865d-bc26fdf7da07",
+  "name": "Expense From Co CSO",
+  "documentStage": "EXPENSES",
+  "scopeType": "DEPARTMENT",
+  "minAmount": "0",
+  "maxAmount": null,
+  "isActive": true,
+  "createdAt": "2026-09-15T08:01:05.291Z",
+  "updatedAt": "2026-09-15T08:01:56.322Z"
+ },
+ {
+  "id": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "name": "Expense - Karangan Bunga",
+  "documentStage": "EXPENSES",
+  "scopeType": "DEPARTMENT",
+  "minAmount": "0",
+  "maxAmount": null,
+  "isActive": true,
+  "createdAt": "2026-10-08T10:11:50.806Z",
+  "updatedAt": "2026-10-09T07:15:42.137Z"
+ }
+]

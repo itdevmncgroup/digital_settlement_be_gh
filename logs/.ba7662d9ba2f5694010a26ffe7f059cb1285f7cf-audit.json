@@ -39,6 +39,56 @@
             "date": 1790566617934,
             "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-28.log",
             "hash": "c02f02f173cdad9298dd1fa53dd3407c70acb09fb30e41c426d15d1e62bf9493"
+        },
+        {
+            "date": 1790739832564,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-09-30.log",
+            "hash": "2e5a6c9b3ac9040a200797e9f7780e25f6668105781af503e8762be2ea5a02a0"
+        },
+        {
+            "date": 1790835638871,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-01.log",
+            "hash": "50a0e45cf284a806ad79c06c7f4784a26e4fd04d1c91e9b374e0ee196aeee451"
+        },
+        {
+            "date": 1790912586602,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-02.log",
+            "hash": "0dc1532d19f182a7014936b3809031a7c1d0d576cdba1884be569595bb617f9b"
+        },
+        {
+            "date": 1791169728875,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-05.log",
+            "hash": "fc1003d05a4050a9a9f6115ac4cf9a98857d336545837211c382b13a1d81ac94"
+        },
+        {
+            "date": 1791255286404,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-06.log",
+            "hash": "263cb24d864d3ec423d06adace2d50261fc37ce8dc1ed16e0249aa08e91869c0"
+        },
+        {
+            "date": 1791343338169,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-07.log",
+            "hash": "f6d370dbb756d29188e0fac6c12b71936686a422a55d60bb4bcecaa59f75b6c4"
+        },
+        {
+            "date": 1791424304888,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-08.log",
+            "hash": "25efc89162ac6458418051c7e832a46cc4aa266829bd5a8f9ccba3be7991952b"
+        },
+        {
+            "date": 1791511246706,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-09.log",
+            "hash": "addf9b5c1c9ad4702f17ec1994d96226e766e96509b944bcca1fe0443fc26afb"
+        },
+        {
+            "date": 1791770905996,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-12.log",
+            "hash": "82b3abdd4a872899b48667d889a4d3f497c105ccd4963750595def0765047775"
+        },
+        {
+            "date": 1791862291865,
+            "name": "D:\\MyProjects\\MNC\\digital_settlement_be\\logs\\error-2026-10-13.log",
+            "hash": "e5df4ded57913610b159aef7780ec0ff02d449b611dd17852b5da73ace640b34"
         }
     ],
     "hashType": "sha256"

@@ -1,0 +1,52 @@
+[
+ {
+  "id": "14c6ef3f-e644-44f0-93dc-1dc04fb8b860",
+  "bank": "MNC BANK",
+  "last4": "0003",
+  "createdAt": "2026-09-16T08:49:38.961Z",
+  "updatedAt": "2026-10-07T12:27:05.846Z",
+  "isActive": true,
+  "departmentId": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "userId": "6dcf4b86-5483-44b6-8a3a-641e4c2c075e"
+ },
+ {
+  "id": "2259fa34-7f76-41e0-8784-05d10c5f4aeb",
+  "bank": "MNC BANK",
+  "last4": "0004",
+  "createdAt": "2026-09-16T08:49:57.135Z",
+  "updatedAt": "2026-10-07T12:27:02.074Z",
+  "isActive": true,
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "userId": "6439dfcd-4e59-4e11-8590-47170aab1657"
+ },
+ {
+  "id": "48934dd5-2151-4739-9b83-4570eb22d032",
+  "bank": "MNC BANK",
+  "last4": "0005",
+  "createdAt": "2026-10-07T12:31:28.397Z",
+  "updatedAt": "2026-10-07T12:31:28.397Z",
+  "isActive": true,
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "userId": "a2a4df53-4957-403a-aaef-844979405f45"
+ },
+ {
+  "id": "6866a1f3-e0f9-4de5-a892-5006872bb342",
+  "bank": "MNC BANK",
+  "last4": "0002",
+  "createdAt": "2026-09-08T03:57:12.140Z",
+  "updatedAt": "2026-10-07T12:26:57.450Z",
+  "isActive": true,
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "userId": "312ede40-3d9e-4b6e-8b02-c3bb2af0685a"
+ },
+ {
+  "id": "bb91e734-2a59-4ae2-8d93-5063c46d7612",
+  "bank": "MNC BANK",
+  "last4": "0001",
+  "createdAt": "2026-09-08T03:56:46.951Z",
+  "updatedAt": "2026-10-07T12:26:50.850Z",
+  "isActive": true,
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "userId": "45f8c4f1-26ff-4b56-961d-471aa1f79ede"
+ }
+]

@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { RoleName } from 'src/common/constants/role-name';
-import { ApprovalsService } from './approvals.service';
+import { ApprovalsService, RollbackDocType } from './approvals.service';
+import { RollbackDto } from './dto/rollback.dto';
 import { CreateApprovalLevelDto, UpdateApprovalLevelDto } from './dto/approval-level.dto';
 import { RejectDto } from './dto/reject.dto';
+import { ReviseDto } from './dto/revise.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -44,6 +46,37 @@ export class ApprovalLevelsController {
   }
 }
 
+function parseRollbackType(raw: string): RollbackDocType {
+  const type = raw.toUpperCase();
+  if (type !== 'EXPENSE' && type !== 'SETTLEMENT' && type !== 'EXPENSE_REQUEST') {
+    throw new BadRequestException('type must be EXPENSE, SETTLEMENT or EXPENSE_REQUEST');
+  }
+  return type;
+}
+
+// System > Rollback: Administrator rewinds an Expense / Settlement / Expense Request approval chain N tiers.
+@Controller('approval-rollback')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleName.ADMIN)
+export class ApprovalRollbackController {
+  constructor(private readonly service: ApprovalsService) {}
+
+  @Get(':type')
+  search(@Param('type') type: string, @Query('q') q?: string) {
+    return this.service.searchRollbackCandidates(parseRollbackType(type), q);
+  }
+
+  @Get(':type/:id')
+  preview(@Param('type') type: string, @Param('id') id: string) {
+    return this.service.getRollbackPreview(parseRollbackType(type), id);
+  }
+
+  @Post(':type/:id')
+  rollback(@Param('type') type: string, @Param('id') id: string, @Body() dto: RollbackDto, @CurrentUser() actor: AuthUser) {
+    return this.service.rollbackApproval(parseRollbackType(type), id, dto.steps, dto.reason, actor);
+  }
+}
+
 // Approval Workflow (BRD section 22, 26 -> Transaction > Approval). Authorization
 // is no longer role-based: any authenticated user may call these, but the service
 // only allows an action when the caller is the step's resolvedApproverId.
@@ -80,6 +113,24 @@ export class ApprovalsController {
   @Post('expense/:expenseId/reject')
   rejectExpense(@Param('expenseId') expenseId: string, @Body() dto: RejectDto, @CurrentUser() actor: AuthUser) {
     return this.service.reject(actor.userId, { expenseId }, dto.reason, actor.roles, actor.permissions);
+  }
+
+  // Sends the Expense back exactly one approval tier instead of rejecting it
+  // outright - see ApprovalsService.revise.
+  @Post('expense/:expenseId/revise')
+  reviseExpense(@Param('expenseId') expenseId: string, @Body() dto: ReviseDto, @CurrentUser() actor: AuthUser) {
+    return this.service.revise(actor.userId, { expenseId }, dto.reason, actor.roles, actor.permissions);
+  }
+
+  // Expense Request chain (Head Dept -> Co-CSO); budget + Corsec stages live on ExpenseRequestsController.
+  @Post('expense-request/:expenseRequestId/approve')
+  approveExpenseRequest(@Param('expenseRequestId') expenseRequestId: string, @CurrentUser() actor: AuthUser) {
+    return this.service.approve(actor.userId, { expenseRequestId }, actor.roles);
+  }
+
+  @Post('expense-request/:expenseRequestId/reject')
+  rejectExpenseRequest(@Param('expenseRequestId') expenseRequestId: string, @Body() dto: RejectDto, @CurrentUser() actor: AuthUser) {
+    return this.service.reject(actor.userId, { expenseRequestId }, dto.reason, actor.roles);
   }
 
   @Post('event/:eventId/approve')

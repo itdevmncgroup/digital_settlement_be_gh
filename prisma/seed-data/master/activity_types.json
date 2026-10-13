@@ -1,0 +1,38 @@
+[
+ {
+  "id": "1aae8e26-464e-4bd0-8c73-918f3a5e0838",
+  "name": "Sumbangan",
+  "isActive": true,
+  "createdAt": "2026-10-07T10:33:53.800Z"
+ },
+ {
+  "id": "30434fc2-4f98-432f-aee6-d02a7a9cee22",
+  "name": "Ucapan Simpati",
+  "isActive": true,
+  "createdAt": "2026-10-07T10:33:53.810Z"
+ },
+ {
+  "id": "60b0ac8b-f0ee-4642-ad73-15c4aad9430c",
+  "name": "Makanan/Kue",
+  "isActive": true,
+  "createdAt": "2026-10-07T10:33:53.816Z"
+ },
+ {
+  "id": "6571424b-dd10-44fa-b7a6-7301111bdf8d",
+  "name": "Karangan Bunga",
+  "isActive": true,
+  "createdAt": "2026-10-07T16:27:42.990Z"
+ },
+ {
+  "id": "a669a2d5-17cc-488c-97c2-99e4472e0351",
+  "name": "Souvenir",
+  "isActive": true,
+  "createdAt": "2026-10-07T10:33:53.807Z"
+ },
+ {
+  "id": "fe4f2fe6-c759-4d22-a3fd-88ccdd8dbbd8",
+  "name": "Parcel/Bingkisan",
+  "isActive": true,
+  "createdAt": "2026-10-07T10:33:53.803Z"
+ }
+]

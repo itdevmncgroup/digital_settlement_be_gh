@@ -31,11 +31,29 @@ export class GenerateSettlementDto {
 
   @IsIn(PAYMENT_METHOD_GROUPS)
   paymentMethodGroup!: PaymentMethodGroup;
+
+  // Narrows the preview to one specific Corporate Card (a Department can hold
+  // more than one) - ignored for NON_CORPORATE_CARD.
+  @IsOptional()
+  @IsString()
+  creditCardId?: string;
+
+  // Narrows the preview to Expenses of these Activity Types - blank/omitted
+  // means any Activity Type.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  activityTypeIds?: string[];
 }
 
 // Adds already-eligible Expenses (SETTLED, matched, same Department, not yet
 // grouped) to an existing DRAFT Settlement - the "add to existing settlement"
 // action on the web admin Settlement page.
+export class SendDraftPrDto {
+  @IsString()
+  unitId!: string;
+}
+
 export class AddExpensesToSettlementDto {
   @IsArray()
   @ArrayNotEmpty()
@@ -118,6 +136,12 @@ export class CreateSettlementFromSelectionDto {
 
   @IsIn(PAYMENT_METHOD_GROUPS)
   paymentMethodGroup!: PaymentMethodGroup;
+
+  // Same Corporate Card filter as GenerateSettlementDto - re-validated here so a
+  // stale/tampered selection can't slip in an Expense on a different card.
+  @IsOptional()
+  @IsString()
+  creditCardId?: string;
 
   // The Unit/Persentase/Analytic Acc/... rows entered below the Expense list in
   // the Create Settlement popup - optional so existing callers/tests still work.

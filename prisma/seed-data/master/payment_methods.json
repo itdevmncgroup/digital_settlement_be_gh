@@ -1,0 +1,30 @@
+[
+ {
+  "id": "9b1f1a10-0002-4000-8000-000000000001",
+  "code": "AP_DISBURSEMENT",
+  "name": "AP Disbursement",
+  "isActive": true,
+  "createdAt": "2026-10-07T16:27:42.789Z"
+ },
+ {
+  "id": "9b1f1a10-0002-4000-8000-000000000002",
+  "code": "CORPORATE_CARD",
+  "name": "Corporate Card",
+  "isActive": true,
+  "createdAt": "2026-10-07T16:27:42.789Z"
+ },
+ {
+  "id": "9b1f1a10-0002-4000-8000-000000000003",
+  "code": "PETTY_CASH",
+  "name": "Petty Cash",
+  "isActive": true,
+  "createdAt": "2026-10-07T16:27:42.789Z"
+ },
+ {
+  "id": "9b1f1a10-0002-4000-8000-000000000004",
+  "code": "REIMBURSEMENT",
+  "name": "Reimbursement",
+  "isActive": true,
+  "createdAt": "2026-10-07T16:27:42.789Z"
+ }
+]

@@ -1,0 +1,138 @@
+[
+ {
+  "id": "04e73ccc-03ed-447e-ab82-1c539e2c07fe",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "positionId": "d8451cc8-f7c8-461f-9808-1cf3d3aa92c7",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:42:08.569Z"
+ },
+ {
+  "id": "0e4016d3-b91b-4ae5-baf0-aadbe6790a3b",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "positionId": "77b4e457-46cb-40fa-9062-157b3dcfdf04",
+  "userId": "312ede40-3d9e-4b6e-8b02-c3bb2af0685a",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:01:12.873Z"
+ },
+ {
+  "id": "10908ee3-c184-48a4-adfe-fb14fab3f3da",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "positionId": "2643edde-9188-4e32-9e49-16d2b71dd763",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:13:42.488Z"
+ },
+ {
+  "id": "123b2020-8c19-4d35-bbae-3e01bfad5a40",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "positionId": "d8451cc8-f7c8-461f-9808-1cf3d3aa92c7",
+  "userId": "4b1bee4d-673b-40e8-852a-34ea8e719663",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:01:35.480Z"
+ },
+ {
+  "id": "16b8c6d0-479a-4bbf-a3ea-e767f7f27fd1",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "positionId": "c4f5bc14-7b8a-462c-a025-cdb8bce02f57",
+  "userId": "be487149-60d1-4e69-a706-1bf8911e3924",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-08T10:42:04.189Z"
+ },
+ {
+  "id": "31a0236b-0d20-4e4c-8250-587e9b478313",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "positionId": "d8451cc8-f7c8-461f-9808-1cf3d3aa92c7",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-09T03:56:36.397Z"
+ },
+ {
+  "id": "7c096752-5fcc-4042-993b-28a0b67187cd",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "positionId": "2643edde-9188-4e32-9e49-16d2b71dd763",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:42:08.602Z"
+ },
+ {
+  "id": "85ebc5cb-67d8-4c76-aaaa-8a8c3b791476",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "positionId": "84b6df8e-7392-4f2f-b080-70c7eec7dd38",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:19:49.827Z"
+ },
+ {
+  "id": "9f258cb8-7d43-4264-821e-7182eb6bc5ef",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "positionId": "2643edde-9188-4e32-9e49-16d2b71dd763",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:42:08.599Z"
+ },
+ {
+  "id": "a6ed2b63-7b95-4bc4-a2f6-4c4e2e8bdc6e",
+  "departmentId": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "positionId": "d8451cc8-f7c8-461f-9808-1cf3d3aa92c7",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:42:08.583Z"
+ },
+ {
+  "id": "b326cf85-8672-4dd8-b3e0-0bd9541aa95a",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "positionId": "84b6df8e-7392-4f2f-b080-70c7eec7dd38",
+  "userId": "b35f98e7-be56-4ef7-890d-75c887d795b1",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:13:48.339Z"
+ },
+ {
+  "id": "b991bd91-fe2a-4457-a6a4-cb1017c23aca",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "positionId": "2f78f093-b3de-4c9f-89b2-a3d04223affa",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:13:57.224Z"
+ },
+ {
+  "id": "c2c8c309-b154-4807-ac5e-50a4daf04da7",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "positionId": "2f78f093-b3de-4c9f-89b2-a3d04223affa",
+  "userId": "9e0fc752-8db1-40b9-83bd-b3b1bda5b6cb",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:19:54.387Z"
+ },
+ {
+  "id": "ca1a8395-565b-4004-9009-9481c5cc0ea3",
+  "departmentId": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "positionId": "2643edde-9188-4e32-9e49-16d2b71dd763",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:42:08.595Z"
+ },
+ {
+  "id": "d75f8430-35f1-4426-992c-384390c6b70b",
+  "departmentId": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "positionId": "d8451cc8-f7c8-461f-9808-1cf3d3aa92c7",
+  "userId": "fdf37eda-0234-43d1-a322-0f020cdaf8c5",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-14T07:42:08.580Z"
+ },
+ {
+  "id": "e2c259af-9a2a-481d-bc7f-d0ab189926d2",
+  "departmentId": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "positionId": "2643edde-9188-4e32-9e49-16d2b71dd763",
+  "userId": "e3f83e65-31ce-4378-be06-573858bc5ef6",
+  "status": "ACTIVE",
+  "createdAt": "2026-10-07T13:19:43.188Z"
+ },
+ {
+  "id": "f24b0388-bfc1-4ffe-a98c-3ec78af506d9",
+  "departmentId": "97116f94-466a-412e-a342-ba25117eb21f",
+  "positionId": "77b4e457-46cb-40fa-9062-157b3dcfdf04",
+  "userId": "45f8c4f1-26ff-4b56-961d-471aa1f79ede",
+  "status": "ACTIVE",
+  "createdAt": "2026-09-08T03:57:51.727Z"
+ }
+]

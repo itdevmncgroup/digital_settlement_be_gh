@@ -36,27 +36,26 @@ npm run start:dev
 ```
 
 Seed creates:
-- Roles (`SALES`, `SUPERVISOR`, `FINANCE`, `ADMINISTRATOR`, `MANAGEMENT`) plus the Position chain
+- Roles (`SALES`, `ADMINISTRATOR`, `MANAGEMENT`) plus the Position chain
   used by multi-tier approval (Head POD, Koordinator, Dept Head, BOD, Division Head, ...).
 - Units matching the MNC Group structure (`HOLDING`, `RCTI`, `MNCTV`, `GTV`) and default
   Activity Types.
-- An Admin user: `admin@example.com` / `Admin@12345` (override via `SEED_ADMIN_EMAIL` /
+- An Admin user: `admin@example.com` / `123456789` (override via `SEED_ADMIN_EMAIL` /
   `SEED_ADMIN_PASSWORD`).
-- **Demo dataset** (password `Demo@12345`, override via `SEED_DEMO_PASSWORD`): Agencies →
+- **Demo dataset** (password `123456789`, override via `SEED_DEMO_PASSWORD`): Agencies →
   Advertisers → Brands, Cost Centers, Expense Categories, Merchants, PODs, and demo users
   covering every role — Sales (`budi.santoso@example.com`, `siti.rahma@example.com`),
-  Supervisor (`andi.wijaya@example.com`), Finance (`rina.kartika@example.com`),
   Management (`bambang.hartono@example.com`), plus approval-chain position holders
   (`yusuf.pratama@example.com` Head POD, `dewi.anggraini@example.com` Koordinator,
   `hendra.gunawan@example.com` Dept Head, `diana.puspita@example.com` BOD,
-  `andi.wijaya@example.com` Supervisor, `bambang.hartono@example.com` Division Head) —
+  `bambang.hartono@example.com` Division Head) —
   plus Pre-Events and Expenses walking every status so the Dashboard, Approvals inbox, and
   list pages have real data on first login. Re-running `npm run seed` is idempotent —
   Units/Agencies/Advertisers/Brands/PODs/Approval Levels self-correct, transactional demo
   data (events/expenses/users) is skipped if already present.
 - **Bulk stress dataset** (guarded on Agency code `AGY01`): 10 Agencies × 10 Advertisers ×
   10 Brands, 50 Sales split across 10 PODs (`sales1@example.com`..`sales50@example.com`,
-  same `Demo@12345`) — for exercising list pages/search/pickers at scale, no Events/Expenses.
+  same `123456789`) — for exercising list pages/search/pickers at scale, no Events/Expenses.
 
 API is served under `/api/v1`. Login via `POST /api/v1/auth/login`, then send
 `Authorization: Bearer <accessToken>` on subsequent requests.
@@ -69,7 +68,7 @@ API is served under `/api/v1`. Login via `POST /api/v1/auth/login`, then send
 | Master Data | `units`, `agencies`, `advertisers`, `brands`, `sales-assignments`, `activity-types`, `cost-centers`, `expense-categories`, `merchants`, `credit-cards` | Agency → Advertiser → Brand is a strict 1:N ownership chain, not a link table |
 | Transactions | `events` (Pre-Event, mandatory), `expenses`, `invoices` | Invoice has separate `ocr_*` vs `final_*` columns; this API only ever writes `final_*` |
 | Approval | `approvals` | `ApprovalLevel` master data scoped by `DocumentStage` (`EXPENSES`/`SETTLEMENT`/legacy `PRE_EVENT`) + amount range + optional `Department`, resolved to an ordered `Position` chain |
-| Settlement/Matching | `settlements`, `bank-matching`, `external-sync` | Groups matched Expenses into a `Settlement`, runs its own approval tier, pushes to an external system on final approval |
+| Settlement/Matching | `settlements`, `bank-matching`, `external-sync` | Groups matched Expenses into a `Settlement`, runs its own approval tier, then Sales CS sends it to an external system manually (Create Draft PR) |
 | Import/OCR | `import`, `ocr` | Excel/CSV/PDF import for master data + Expense, invoice OCR summary extraction |
 | Cross-cutting | `audit-logs`, `email` | Every mutation writes to `audit_logs`; `email` sends one-click approval links |
 
@@ -81,16 +80,16 @@ API is served under `/api/v1`. Login via `POST /api/v1/auth/login`, then send
 - **Pre-Event is mandatory**: Sales must `POST /events` + `/events/:id/submit` and get it
   approved before spending. `POST /expenses` requires `eventId` pointing at that Sales'
   own approved event — `advertiserId`/`brandId`/`activityTypeId`/`unitId` are inherited
-  from the event. Admin/Finance can create/submit an Event on behalf of another Sales via
+  from the event. Admin can create/submit an Event on behalf of another Sales via
   an optional `salesId` in the body (same pattern as manual Expense entry).
 - **Two approval chains**:
   1. **Expense chain** — `Expense.status` mirrors the current tier
-     (`ExpenseStatus.APPROVAL_<POSITION_CODE>`), e.g. HEAD_POD → CO-CSO,
+     (`ExpenseStatus.APPROVAL_<POSITION_CODE>`), e.g. HEAD-POD → CO-CSO,
      terminal state `READY_TO_MATCHING`.
   2. **Settlement chain** — entered once matched Expenses are grouped into a
      `Settlement` (e.g. SLS_MAR_DIR → VP_ACC_BIL_TAX_3TV → CO_CFO_3TV). Each tier's
      approver reviews every member Expense, then submits the whole batch in one call.
-     Final tier triggers `ExternalSyncService.pushSettlement`.
+     Final tier only marks it COMPLETE - a holder of `settlement.send.odoo.all` (any Settlement) / `settlement.send.odoo.owndept` (own Department's Settlements) / Admin then picks a Unit and sends it via "Create Draft PR" (`GET :id/draft-pr/preview`, `POST :id/draft-pr/send` -> `ExternalSyncService.pushSettlement`).
   Override permissions (`expense.approve.all`/`.owndept`, `approval.read.all`/`.owndept`)
   let non-assigned actors act on/view others' pending approvals.
 - **Bank-statement auto-matching**: uploaded PDF statements are parsed into

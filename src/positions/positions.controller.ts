@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Delete, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { PositionsService } from './positions.service';
 import { CreatePositionDto, UpdatePositionDto } from './dto/position.dto';
@@ -32,5 +32,11 @@ export class PositionsController {
   @Roles(RoleName.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdatePositionDto, @CurrentUser() actor: AuthUser) {
     return this.positionsService.update(id, dto, actor.userId);
+  }
+
+  @Delete(':id')
+  @Roles(RoleName.ADMIN)
+  remove(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.positionsService.remove(id, actor.userId);
   }
 }

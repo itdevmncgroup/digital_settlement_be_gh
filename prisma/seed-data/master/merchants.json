@@ -1,0 +1,35 @@
+[
+ {
+  "id": "4923a01f-f4ee-47e3-b37a-8ee5b25670f9",
+  "name": "Starbucks Coffee",
+  "normalizedName": "STARBUCKS COFFEE",
+  "alias": [
+   "STARBUCKS"
+  ],
+  "createdAt": "2026-09-07T10:52:38.179Z",
+  "updatedAt": "2026-09-07T10:52:38.179Z",
+  "isActive": true
+ },
+ {
+  "id": "bc27ac04-bdb5-4abd-a1f8-61f1ea5874d6",
+  "name": "Din Tai Fung",
+  "normalizedName": "DIN TAI FUNG",
+  "alias": [
+   "DTF"
+  ],
+  "createdAt": "2026-09-07T10:52:38.179Z",
+  "updatedAt": "2026-09-07T10:52:38.179Z",
+  "isActive": true
+ },
+ {
+  "id": "c5dbd4d9-92c7-4fe9-8bf2-aceffd5f1de0",
+  "name": "Sushi Tei",
+  "normalizedName": "SUSHI TEI",
+  "alias": [
+   "SUSHITEI"
+  ],
+  "createdAt": "2026-09-07T10:52:38.178Z",
+  "updatedAt": "2026-09-07T10:52:38.178Z",
+  "isActive": true
+ }
+]

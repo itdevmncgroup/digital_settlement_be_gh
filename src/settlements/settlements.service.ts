@@ -1,10 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ExpenseStatus, Prisma, SettlementStatus } from '@prisma/client';
+import { ExpenseStatus, OdooSyncStatus, Prisma, SettlementStatus } from '@prisma/client';
+import { RoleName } from '../common/constants/role-name';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
-import { canViewAllRecords } from '../common/rbac/scope.util';
+import { canViewAllRecords, getActorDepartmentIds } from '../common/rbac/scope.util';
 import { ApprovalsService } from '../approvals/approvals.service';
+import { ExternalSyncService } from '../external-sync/external-sync.service';
+import { SettlementPdfService } from './settlement-pdf.service';
 import { PaymentMethodGroup, SettlementAllocationRowDto } from './dto/settlement.dto';
 
 const include = {
@@ -108,14 +111,17 @@ const include = {
 // own approval chain: SLS_MAR_DIR -> VP_ACC_BIL_TAX_3TV -> CO_CFO_3TV. Each
 // tier's approver reviews the member Expenses one by one and then presses
 // Submit to close the tier (ApprovalsService.reviewSettlementExpense /
-// submitSettlementTier); the final Submit marks everything COMPLETE and pushes
-// the batch to the external system. One Settlement per Department per click.
+// submitSettlementTier); the final Submit marks everything COMPLETE. Pushing the
+// batch to the external system is a separate manual step (sendDraftPr).
+// One Settlement per Department per click.
 @Injectable()
 export class SettlementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly approvals: ApprovalsService,
+    private readonly externalSync: ExternalSyncService,
+    private readonly pdf: SettlementPdfService,
   ) {}
 
   async findAll(actor: AuthUser, departmentId?: string) {
@@ -210,6 +216,8 @@ export class SettlementsService {
     paymentMethodGroup: PaymentMethodGroup,
     actorId: string,
     actorRoles: string[],
+    creditCardId?: string,
+    activityTypeIds?: string[],
   ) {
     if (!this.isBackOffice(actorRoles)) {
       await this.assertMemberOfDepartment(actorId, departmentId);
@@ -228,8 +236,9 @@ export class SettlementsService {
           expenseDate: { gte: from, lte: to },
           isMatched: true,
           status: ExpenseStatus.READY_TO_SETTLED,
+          ...(activityTypeIds && activityTypeIds.length > 0 ? { activityTypeId: { in: activityTypeIds } } : {}),
           ...(paymentMethodGroup === 'CORPORATE_CARD'
-            ? { paymentMethod: { code: 'CORPORATE_CARD' } }
+            ? { paymentMethod: { code: 'CORPORATE_CARD' }, ...(creditCardId ? { creditCardId } : {}) }
             : { OR: [{ paymentMethodId: null }, { paymentMethod: { code: { not: 'CORPORATE_CARD' } } }] }),
         },
         select: {
@@ -276,6 +285,7 @@ export class SettlementsService {
     actorId: string,
     actorRoles: string[],
     allocations: SettlementAllocationRowDto[] = [],
+    creditCardId?: string,
   ) {
     if (!this.isBackOffice(actorRoles)) {
       await this.assertMemberOfDepartment(actorId, departmentId);
@@ -291,6 +301,7 @@ export class SettlementsService {
         status: true,
         isMatched: true,
         amount: true,
+        creditCardId: true,
         paymentMethod: { select: { code: true } },
       },
     });
@@ -306,7 +317,8 @@ export class SettlementsService {
         e.settlementId !== null ||
         !e.isMatched ||
         e.status !== ExpenseStatus.READY_TO_SETTLED ||
-        this.groupOf(e.paymentMethod?.code) !== paymentMethodGroup,
+        this.groupOf(e.paymentMethod?.code) !== paymentMethodGroup ||
+        (!!creditCardId && e.creditCardId !== creditCardId),
     );
     if (missing.length > 0 || ineligible.length > 0) {
       const bad = [...missing, ...ineligible.map((e) => e.expenseNo)];
@@ -442,8 +454,8 @@ export class SettlementsService {
     actorRoles: string[],
   ) {
     const before = await this.findOne(id);
-    if (before.status !== SettlementStatus.DRAFT_SETTLEMENT) {
-      throw new BadRequestException('Only a draft settlement can be edited');
+    if (before.status !== SettlementStatus.DRAFT_SETTLEMENT && before.status !== SettlementStatus.REVISION) {
+      throw new BadRequestException('Only a draft or revision-pending settlement can be edited');
     }
     if (!this.isBackOffice(actorRoles)) {
       await this.assertMemberOfDepartment(actorId, before.departmentId);
@@ -513,7 +525,17 @@ export class SettlementsService {
           data: allocationRows.map((row) => this.buildAllocationRow(id, totalAmount, row)),
         });
       }
-      return tx.settlement.update({ where: { id }, data: { totalAmount }, include });
+      await tx.settlement.update({ where: { id }, data: { totalAmount } });
+
+      // Revise() parked this batch at REVISION one tier back - resume its
+      // existing chain at that same tier now that it's been edited (this
+      // overwrites status off REVISION onto the resumed tier), instead of
+      // restarting from step 0.
+      if (before.status === SettlementStatus.REVISION) {
+        await this.approvals.resumeSettlementApproval(tx, id);
+      }
+
+      return tx.settlement.findUniqueOrThrow({ where: { id }, include });
     });
 
     await this.audit.log({ userId: actorId, action: 'UPDATE', objectType: 'Settlement', objectId: id, oldValue: before, newValue: updated });
@@ -533,6 +555,96 @@ export class SettlementsService {
     return settlement;
   }
 
+  // Manual retry for a Settlement whose push to Odoo FAILED (or is still
+  // NOT_STARTED/PENDING despite being COMPLETE) - ExternalSyncService.pushSettlement
+  // itself guards against re-sending an already-SENT Settlement.
+  async retrySync(id: string, actorId: string) {
+    const settlement = await this.findOne(id);
+    if (settlement.status !== SettlementStatus.COMPLETE) {
+      throw new BadRequestException('Only a COMPLETE settlement can be synced to Odoo');
+    }
+    if (settlement.odooSyncStatus === OdooSyncStatus.SENT) {
+      throw new BadRequestException('This settlement has already been sent to Odoo');
+    }
+    // No statement upload on a retry - the PDF carries no bank statement pages.
+    await this.externalSync.pushSettlement(id, { attachment: await this.pdf.build(id) });
+    await this.audit.log({ userId: actorId, action: 'RETRY_SYNC', objectType: 'Settlement', objectId: id });
+    return this.findOne(id);
+  }
+
+  // "Create Draft PR": a COMPLETE Settlement is no longer pushed to Odoo by its
+  // final approval tier - Sales CS picks the Unit (becomes the PR's org_id),
+  // previews the allocation lines, then sends. Gated by Permission master data:
+  // settlement.send.odoo.all (any Settlement) or settlement.send.odoo.owndept
+  // (Settlement's Department is one of the actor's own). Admin may act as well.
+  private async assertCanDraftPr(actor: AuthUser, departmentId: string) {
+    if (actor.roles.includes(RoleName.ADMIN)) return;
+    const permissions = actor.permissions ?? [];
+    if (permissions.includes('settlement.send.odoo.all')) return;
+    if (permissions.includes('settlement.send.odoo.owndept')) {
+      const actorDeptIds = await getActorDepartmentIds(this.prisma, actor.userId);
+      if (actorDeptIds.includes(departmentId)) return;
+    }
+    throw new ForbiddenException('You are not allowed to create a Draft PR for this settlement');
+  }
+
+  private async loadDraftPrTarget(id: string, unitId: string) {
+    if (!unitId) throw new BadRequestException('Unit is required');
+    const settlement = await this.findOne(id);
+    if (settlement.status !== SettlementStatus.COMPLETE) {
+      throw new BadRequestException('Only a COMPLETE settlement can be sent to Odoo');
+    }
+    const unit = await this.prisma.unit.findUnique({ where: { id: unitId }, select: { id: true, code: true, name: true } });
+    if (!unit) throw new NotFoundException('Unit not found');
+    return { settlement, unit };
+  }
+
+  async previewDraftPr(id: string, unitId: string, actor: AuthUser) {
+    const { settlement, unit } = await this.loadDraftPrTarget(id, unitId);
+    await this.assertCanDraftPr(actor, settlement.departmentId);
+    return {
+      settlementNo: settlement.settlementNo,
+      odooSyncStatus: settlement.odooSyncStatus,
+      unit,
+      // Same columns as the Settlement Allocation section of the Settlement form.
+      rows: settlement.allocations.map((a) => ({
+        id: a.id,
+        product: a.account,
+        unitCode: a.unit.code,
+        percentage: a.percentage,
+        curr: a.curr,
+        qty: a.qty,
+        total: a.totalPrice,
+        description: a.description,
+      })),
+    };
+  }
+
+  async generatePdf(id: string, actor: AuthUser, statement?: Buffer) {
+    const settlement = await this.findOne(id);
+    await this.assertCanDraftPr(actor, settlement.departmentId);
+    const result = await this.pdf.build(id, statement);
+    await this.audit.log({ userId: actor.userId, action: 'GENERATE_PDF', objectType: 'Settlement', objectId: id });
+    return result;
+  }
+
+  // pushSettlement never throws (a failed push is persisted as FAILED), so the
+  // caller reads odooSyncStatus / odooSyncError off the returned Settlement.
+  // `statement` is the bank statement PDF picked in the popup - the same PDF
+  // "Generate PDF" produced is rebuilt here and sent to Odoo as the attachment.
+  async sendDraftPr(id: string, unitId: string, actor: AuthUser, statement?: Buffer) {
+    const { settlement, unit } = await this.loadDraftPrTarget(id, unitId);
+    await this.assertCanDraftPr(actor, settlement.departmentId);
+    if (settlement.odooSyncStatus === OdooSyncStatus.SENT) {
+      throw new BadRequestException('This settlement has already been sent to Odoo');
+    }
+    // Built before the push so a bad statement upload is a 400, not a FAILED sync.
+    const attachment = await this.pdf.build(id, statement);
+    await this.externalSync.pushSettlement(id, { orgId: unit.code, attachment });
+    await this.audit.log({ userId: actor.userId, action: 'SEND_TO_ODOO', objectType: 'Settlement', objectId: id, newValue: { unitId: unit.id, unitCode: unit.code } });
+    return this.findOne(id);
+  }
+
   // Settlement list's "Submit" action: leaves DRAFT_SETTLEMENT and starts the
   // batch's own approval chain (SLS_MAR_DIR -> VP -> CO_CFO) - both the
   // Settlement and every member Expense take on the first tier's status.
@@ -546,7 +658,7 @@ export class SettlementsService {
     }
 
     const settlement = await this.prisma.$transaction(async (tx) => {
-      await this.approvals.enterSettlementApproval(tx, { settlementId: id, amount: before.totalAmount });
+      await this.approvals.enterSettlementApproval(tx, { settlementId: id, amount: before.totalAmount, departmentId: before.departmentId });
       return tx.settlement.findUniqueOrThrow({ where: { id }, include });
     });
 

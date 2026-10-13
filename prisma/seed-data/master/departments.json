@@ -1,0 +1,58 @@
+[
+ {
+  "id": "5c02c4d4-741e-40bf-929b-35ee5881ecb9",
+  "code": "POD6",
+  "name": "POD6",
+  "createdAt": "2026-09-07T10:52:38.813Z",
+  "updatedAt": "2026-09-07T10:52:38.813Z",
+  "isActive": true
+ },
+ {
+  "id": "69c90eef-be93-47a9-9f5d-725aad1ad53a",
+  "code": "POD7",
+  "name": "POD7",
+  "createdAt": "2026-09-07T10:52:38.813Z",
+  "updatedAt": "2026-09-07T10:52:38.813Z",
+  "isActive": true
+ },
+ {
+  "id": "6b4f8aac-8474-4eb4-afdf-6992ea2bb244",
+  "code": "POD3",
+  "name": "POD3",
+  "createdAt": "2026-09-07T10:52:38.813Z",
+  "updatedAt": "2026-09-07T10:52:38.813Z",
+  "isActive": true
+ },
+ {
+  "id": "7b641194-a787-4488-a333-31869f1a9ca6",
+  "code": "POD2",
+  "name": "POD2",
+  "createdAt": "2026-09-07T10:52:38.813Z",
+  "updatedAt": "2026-09-14T03:41:43.189Z",
+  "isActive": true
+ },
+ {
+  "id": "8a1df28a-245e-4777-93f6-d8fea315bfd7",
+  "code": "POD4",
+  "name": "POD4",
+  "createdAt": "2026-09-07T10:52:38.813Z",
+  "updatedAt": "2026-09-07T10:52:38.813Z",
+  "isActive": true
+ },
+ {
+  "id": "96640b41-d2dc-423b-a6ab-9b6541e0d881",
+  "code": "POD5",
+  "name": "POD5",
+  "createdAt": "2026-09-07T10:52:38.813Z",
+  "updatedAt": "2026-09-07T10:52:38.813Z",
+  "isActive": true
+ },
+ {
+  "id": "97116f94-466a-412e-a342-ba25117eb21f",
+  "code": "POD1",
+  "name": "POD1",
+  "createdAt": "2026-09-07T10:52:38.813Z",
+  "updatedAt": "2026-09-14T03:41:51.083Z",
+  "isActive": true
+ }
+]

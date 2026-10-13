@@ -1,0 +1,98 @@
+[
+ {
+  "id": "299302e5-a22a-4177-bc8c-cfb2ad7ad2e5",
+  "code": "AGY07",
+  "name": "Wavemaker Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "2ca96bf4-5859-4266-864c-a593d625dc75",
+  "code": "AGY06",
+  "name": "PHD Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "529e585e-f8d6-492a-b2ca-9ecd0ebfa8a9",
+  "code": "AGY05",
+  "name": "Initiative Media Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "7826db74-3e9b-4a2f-9eaf-eb9d0f5f8ce5",
+  "code": "GRPM",
+  "name": "GroupM Indonesia",
+  "createdAt": "2026-09-07T10:52:37.688Z",
+  "updatedAt": "2026-09-07T10:52:37.688Z",
+  "isActive": true
+ },
+ {
+  "id": "8e93198f-5b17-41d5-a99f-4e5251098fb2",
+  "code": "AGY02",
+  "name": "Mindshare Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "9118e872-22d7-46f7-95cd-5426eba18925",
+  "code": "AGY10",
+  "name": "Dentsu Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "96f27a7c-6c4f-49cb-828d-00d916b0f6e6",
+  "code": "AGY08",
+  "name": "UM Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "a194348a-f781-4cf8-bc87-2f5fb1e19e13",
+  "code": "OMD",
+  "name": "OMD Indonesia",
+  "createdAt": "2026-09-07T10:52:37.688Z",
+  "updatedAt": "2026-09-07T10:52:37.688Z",
+  "isActive": true
+ },
+ {
+  "id": "bec1c3f4-a1b8-4f39-b30a-aaf1f4f9b07d",
+  "code": "AGY04",
+  "name": "Carat Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "ce4d9f8e-78f7-43c5-8fd5-0c82f42413b2",
+  "code": "AGY01",
+  "name": "Zenith Media Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "e3d61926-26c8-424a-a10c-314abe7db85a",
+  "code": "AGY03",
+  "name": "Starcom Worldwide Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ },
+ {
+  "id": "e503845e-f7a3-4015-8012-5a9add8c0827",
+  "code": "AGY09",
+  "name": "Havas Media Indonesia",
+  "createdAt": "2026-09-07T10:52:38.486Z",
+  "updatedAt": "2026-09-07T10:52:38.486Z",
+  "isActive": true
+ }
+]

@@ -1,0 +1,56 @@
+[
+ {
+  "id": "1e0082aa-79c0-401f-b210-02bbc4fe935e",
+  "name": "SALES_CUSTOMER_SERVICE",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "744f6353-1569-4f8d-9a69-fccf92e8e731",
+  "name": "ADMINISTRATOR",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "873d88ed-134f-4bec-ab9f-1e0b9a52d030",
+  "name": "SALES_ADMIN",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "8d0ca3d6-436a-44e9-ba20-80524d9afdd2",
+  "name": "SALES",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "9d910811-66e2-46a2-8715-3f625d53f199",
+  "name": "HEAD DEPARTMENT",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "a8592ead-47c2-44bd-a2d7-99ec3c3138ee",
+  "name": "CORSEC",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "c31b3d2a-f330-4598-9854-b0f738ada555",
+  "name": "MANAGEMENT",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "e686574f-ad60-4c75-8eb2-97944e291c13",
+  "name": "HEAD_POD",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "fedace8f-2b36-4ebb-a818-86725ccae2a6",
+  "name": "CO_CSO",
+  "description": null,
+  "isActive": true
+ }
+]

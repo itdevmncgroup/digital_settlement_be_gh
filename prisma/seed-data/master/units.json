@@ -1,0 +1,67 @@
+[
+ {
+  "id": "2e7a6ce2-b53f-4f53-936c-af51571ce30a",
+  "code": "GTV",
+  "name": "GTV",
+  "createdAt": "2026-09-07T10:52:37.381Z",
+  "updatedAt": "2026-10-07T13:32:39.483Z",
+  "isActive": true,
+  "revenueSharePercent": "14",
+  "unitCode": "85",
+  "fullName": null,
+  "logoStorageKey": null,
+  "logoMimeType": null
+ },
+ {
+  "id": "60bb9223-fb90-4a8b-8cb4-64d2053c4783",
+  "code": "RCTI",
+  "name": "RCTI",
+  "createdAt": "2026-09-07T10:52:37.372Z",
+  "updatedAt": "2026-10-07T13:32:39.477Z",
+  "isActive": true,
+  "revenueSharePercent": "48",
+  "unitCode": "84",
+  "fullName": null,
+  "logoStorageKey": null,
+  "logoMimeType": null
+ },
+ {
+  "id": "9c7b9b86-5637-455e-b636-8eece979da37",
+  "code": "MNCTV",
+  "name": "MNCTV",
+  "createdAt": "2026-09-07T10:52:37.378Z",
+  "updatedAt": "2026-10-07T13:32:39.481Z",
+  "isActive": true,
+  "revenueSharePercent": "43",
+  "unitCode": "86",
+  "fullName": null,
+  "logoStorageKey": null,
+  "logoMimeType": null
+ },
+ {
+  "id": "bbe82801-3cac-41b9-816a-959afd9a5091",
+  "code": "INEWS",
+  "name": "INews",
+  "createdAt": "2026-10-07T10:33:53.793Z",
+  "updatedAt": "2026-10-07T13:32:39.484Z",
+  "isActive": true,
+  "revenueSharePercent": null,
+  "unitCode": "83",
+  "fullName": null,
+  "logoStorageKey": null,
+  "logoMimeType": null
+ },
+ {
+  "id": "efeb67c3-0692-4101-846d-9e011a1bd0d2",
+  "code": "HOLDING",
+  "name": "Holding",
+  "createdAt": "2026-09-07T10:52:37.360Z",
+  "updatedAt": "2026-09-07T10:52:37.360Z",
+  "isActive": true,
+  "revenueSharePercent": null,
+  "unitCode": null,
+  "fullName": null,
+  "logoStorageKey": null,
+  "logoMimeType": null
+ }
+]

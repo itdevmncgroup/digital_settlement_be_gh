@@ -18,7 +18,7 @@
 // CommonJS build.
 type PdfjsModule = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 
-async function loadPdfjs(): Promise<PdfjsModule> {
+export async function loadPdfjs(): Promise<PdfjsModule> {
   const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<PdfjsModule>;
   return dynamicImport('pdfjs-dist/legacy/build/pdf.mjs');
 }

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { deleteRecord } from '../common/delete.util';
 import { CreateActivityTypeDto, UpdateActivityTypeDto } from './dto/activity-type.dto';
 
 @Injectable()
@@ -28,5 +29,12 @@ export class ActivityTypesService {
     const item = await this.prisma.activityType.update({ where: { id }, data: dto });
     await this.audit.log({ userId: actorId, action: 'UPDATE', objectType: 'ActivityType', objectId: id, oldValue: before, newValue: item });
     return item;
+  }
+
+  async remove(id: string, actorId: string) {
+    const before = await this.findOne(id);
+    await deleteRecord('Activity type', () => this.prisma.activityType.delete({ where: { id } }));
+    await this.audit.log({ userId: actorId, action: 'DELETE', objectType: 'ActivityType', objectId: id, oldValue: before });
+    return { id };
   }
 }

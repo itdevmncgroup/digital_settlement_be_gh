@@ -20,6 +20,16 @@ export class CreateUnitDto {
   @Transform(blankToUndefined)
   @IsNumberString()
   revenueSharePercent?: string;
+
+  @IsOptional()
+  @Transform(blankToUndefined)
+  @IsString()
+  unitCode?: string;
+
+  // Official/long company name; '' clears it (UnitsService turns that into null).
+  @IsOptional()
+  @IsString()
+  fullName?: string;
 }
 
 export class UpdateUnitDto {
@@ -39,4 +49,14 @@ export class UpdateUnitDto {
   @Transform(blankToUndefined)
   @IsNumberString()
   revenueSharePercent?: string;
+
+  @IsOptional()
+  @Transform(blankToUndefined)
+  @IsString()
+  unitCode?: string;
+
+  // Official/long company name; '' clears it (UnitsService turns that into null).
+  @IsOptional()
+  @IsString()
+  fullName?: string;
 }

@@ -43,7 +43,7 @@ export class InvoicesController {
   // parsed items/totals can pre-fill the form before anything is saved.
   @Post('invoices/ocr-scan')
   @Roles(RoleName.SALES, RoleName.ADMIN)
-  @RequirePermission('expense.create.all', 'expense.create.owndept')
+  @RequirePermission('expense.create.all', 'expense.create.own', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -63,7 +63,7 @@ export class InvoicesController {
 
   @Post('expenses/:expenseId/invoices')
   @Roles(RoleName.SALES, RoleName.ADMIN)
-  @RequirePermission('expense.create.all', 'expense.create.owndept')
+  @RequirePermission('expense.create.all', 'expense.create.own', 'expense.create.owndept')
   create(@Param('expenseId') expenseId: string, @Body() dto: CreateInvoiceDto, @CurrentUser() actor: AuthUser) {
     return this.service.createForExpense(expenseId, dto, actor.userId, actor.roles, actor.permissions);
   }
@@ -81,7 +81,7 @@ export class InvoicesController {
 
   @Post('invoices/:id/files')
   @Roles(RoleName.SALES, RoleName.ADMIN)
-  @RequirePermission('expense.create.all', 'expense.create.owndept')
+  @RequirePermission('expense.create.all', 'expense.create.own', 'expense.create.owndept')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

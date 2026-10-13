@@ -27,6 +27,7 @@ import { CreditCardsModule } from './credit-cards/credit-cards.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 
 import { EventsModule } from './events/events.module';
+import { ExpenseRequestsModule } from './expense-requests/expense-requests.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { ApprovalsModule } from './approvals/approvals.module';
@@ -73,6 +74,7 @@ import { ExternalSyncModule } from './external-sync/external-sync.module';
     PaymentMethodsModule,
 
     EventsModule,
+    ExpenseRequestsModule,
     ExpensesModule,
     InvoicesModule,
     ApprovalsModule,

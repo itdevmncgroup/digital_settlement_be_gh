@@ -34,6 +34,12 @@ export class CreateApprovalLevelDto {
   @IsString({ each: true })
   requestorPositionIds?: string[];
 
+  // Optional ActivityType filter - can list several; omit/empty = any activity type.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  activityTypeIds?: string[];
+
   @IsNumber()
   @Min(0)
   minAmount: number;
@@ -69,6 +75,12 @@ export class UpdateApprovalLevelDto {
   @IsArray()
   @IsString({ each: true })
   requestorPositionIds?: string[];
+
+  // [] clears the filter; omitted leaves it as is.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  activityTypeIds?: string[];
 
   @IsOptional()
   @IsNumber()

@@ -27,6 +27,16 @@ scripts, since the Prisma CLI is a separate process). Standalone scripts under `
 that call `new PrismaClient()` directly (not through those npm scripts) still expect
 `DATABASE_URL` exported in the shell — they don't go through this resolver.
 
+Seeding (`npm run seed`): `prisma/seed-master-snapshot.ts` loads `prisma/seed-data/master/*.json`
+(exported from a real DB) into an EMPTY database keeping original ids; `prisma/seed.ts` then tops up
+idempotently from hardcoded tables (roles, permissions, role→permission defaults, positions, departments
+POD1-7, approval levels, core users, department approvers) that mirror that snapshot. After changing
+master data in the live DB, re-run the export script and update those tables in `seed.ts` to match.
+
+Master `DELETE /:id` endpoints (`deleteRecord` / `assertUnused` in `src/common/delete.util.ts`): FK-referenced
+rows return 409 "deactivate instead"; SET NULL references (users.unitId/positionId, expenses.paymentMethodId...)
+are checked explicitly because the DB would otherwise orphan them silently. Built-in roles can't be deleted.
+
 No test suite exists (`npm test` not defined) — don't assume Jest is wired up.
 
 ## Windows path caveat
@@ -46,6 +56,7 @@ npm run prisma:migrate         # dev migration + seed
 npm run prisma:migrate:deploy  # prod
 npm run prisma:studio
 npm run seed                   # prisma/seed.ts via ts-node
+node scripts/export-master-snapshot.js        # refresh prisma/seed-data/master/*.json from the live DB (read-only)
 node scripts/reset-and-seed-expenses.js       # standalone demo-data generator, not an npm script
 node scripts/generate-sample-statements.js    # standalone bank-statement sample generator
 ```
@@ -82,13 +93,34 @@ Nest module pattern throughout: `*.module.ts` + `*.controller.ts` + `*.service.t
 Two separate approval chains:
 1. **Expense chain** — `Expense.status` mirrors current tier
    (`ExpenseStatus.APPROVAL_<POSITION_CODE>`, `-` normalized to `_` in position codes),
-   e.g. HEAD_POD → CO-CSO, terminal state `READY_TO_MATCHING`. (CO-CSO-1/CO-CSO-2 were
+   e.g. HEAD-POD → CO-CSO, terminal state `READY_TO_MATCHING`. (CO-CSO-1/CO-CSO-2 were
    merged into the single CO-CSO tier — `APPROVAL_CO_CSO_1`/`_2` stay in the enum only
    for historical rows.)
 2. **Settlement chain** — entered once matched Expenses are grouped into a `Settlement`
    (SLS_MAR_DIR → VP_ACC_BIL_TAX_3TV → CO_CFO_3TV). Tier advances only when the approver
    reviews every member Expense individually then submits the batch in one call
-   (`submitSettlementTier`). Final tier triggers `ExternalSyncService.pushSettlement`.
+   (`submitSettlementTier`). Final tier only marks it COMPLETE - a holder of `settlement.send.odoo.all` (any Settlement) / `settlement.send.odoo.owndept` (own Department's Settlements) / Admin then picks a Unit and sends it via "Create Draft PR" (`GET :id/draft-pr/preview`, `POST :id/draft-pr/send` -> `ExternalSyncService.pushSettlement`).
+
+**Expense Request** (`expense-requests`, Karangan Bunga, entered by Sales Admin) is a third,
+separate flow: optional `DRAFT` (requester-only, editable via `PATCH :id`, `POST :id/submit` starts the chain), then Head Dept → Co-CSO via `ApprovalLevel` (`DocumentStage.EXPENSE_REQUEST`,
+`ApprovalRequest.expenseRequestId`, no amount → Level `minAmount` 0; an Admin must configure
+the Level or create fails), then Sales Customer Service (Position `SLS-CS`) fills
+`budgetAmount`, then Corsec (Position `CORSEC`) picks Proceed (`PROCEED`, formerly `APPROVED`) or Cancel (`CANCELLED`, reason kept in `rejectReason`; `REJECTED` = approver reject in the chain). Those last two
+stages are Position-gated in `ExpenseRequestsService`, not `@Roles`. Approve/reject go
+through `POST /approvals/expense-request/:id/approve|reject`; no email one-click link.
+A Request can be keyed in on another user's behalf (`dto.requestedById`; requestor must hold Position `SLS`/`STAFF`/`CO-CSO`
+in the Request's Department, which must be one of the caller's own unless Admin): needs `webmobile.request.expense.create.owndept`
+(or Admin), else 403. The requestor becomes `requestedById`, the caller `ExpenseRequest.createdById` (inputter keeps
+DRAFT edit/submit + list access). Candidates: `GET /expense-requests/requestors` (`listRequestors`).
+`ApprovalLevel.activityTypes` (join table `ApprovalLevelActivityType`, multi; empty = any) filters any stage by Activity Type and
+outranks the other specificity tiers. An `EXPENSE_REQUEST` Level scoped to an Activity Type
+also means Expenses of that Activity Type + Department skip the `EXPENSES` chain
+(`enterExpenseApproval` → straight to `READY_TO_MATCHING`); Settlement chain unchanged.
+E.g. Karangan Bunga: Sales dept → HEAD-POD → CO-CSO, HRD dept → `DIV-HEAD` only.
+
+**Expense from Expense Request**: Corsec (Position `CORSEC`) picks a `PROCEED` Request in All Expenses -> `POST /expenses` with `expenseRequestId` (`ExpensesService.createFromExpenseRequest`), or clicks "Add Invoices" on the Expense Request list -> multipart `POST /expenses/from-request/:requestId` (`files[]`), which does the same and attaches the files as one Invoice (`createFromExpenseRequestWithInvoices`; purpose/amount derived from the Request). Date/Department/Activity Type/Agency/Advertiser/Brand come from the Request, `salesId` = the Request's requester, status `PENDING_SALES_ADMIN`, no chain yet; `Expense.expenseRequestId` is unique (1 Request -> 1 Expense). A `SALES_ADMIN` of the same Department completes it (PATCH + photos/invoices, `canCompletePendingSalesAdmin`) and `POST :id/submit` -> `enterExpenseApproval`, which does NOT apply the "pre-approved, skip to READY_TO_MATCHING" shortcut for a Request-linked Expense, so the Activity-Type-scoped EXPENSES Level ("Expense - Karangan Bunga" -> CO-CSO) runs. Corsec sees only Request-linked Expenses in the list. `request.expense.read.owndept` lets a user list Expense Requests of their own Department(s) (`ExpenseRequestsService.findAll`).
+
+**Expense on behalf of a requestor**: `expense.create.all` (any active user) / `expense.create.owndept` (only users sharing a Department with the caller, and the Expense's Department must be one of the caller's own) - in both cases the requestor must hold Position `SLS`/`STAFF`/`CO-CSO` (`REQUESTOR_POSITION_CODES`) let the caller `POST /expenses` with `salesId` = another user. `salesId` stays the requestor; the caller is stored in `Expense.createdById` (the inputter), who keeps edit/upload/submit access (`assertCanEdit`, `canUploadExpenseFiles`) and sees it in the list. Candidates come from `GET /expenses/requestors` (`ExpensesService.listRequestors`, same rules as `resolveRequestorId`). `expense.create.own` (default for role SALES) only creates the caller's own Expense, within their own Department(s). A caller without `.all`/`.owndept` gets `salesId` ignored.
 
 Override permissions (`expense.approve.all`/`expense.approve.owndept`,
 `approval.read.all`/`approval.read.owndept`) let non-assigned actors act on/view others'

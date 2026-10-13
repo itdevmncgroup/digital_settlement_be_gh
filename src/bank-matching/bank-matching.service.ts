@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BankTxnStatus, ExpenseStatus, Prisma } from '@prisma/client';
+import { BankTxnStatus, ExpenseStatus, Prisma, SettlementStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
@@ -313,6 +313,7 @@ export class BankMatchingService {
     if (expense.status !== ExpenseStatus.READY_TO_MATCHING) {
       throw new BadRequestException('This expense has not cleared its approval chain yet - it cannot be matched');
     }
+    await this.assertSettlementNotSubmitted(expense.settlementId);
     await this.assertMatchOverride(actor, expenseId);
 
     const updated = await this.prisma.bankTransaction.update({
@@ -345,6 +346,13 @@ export class BankMatchingService {
   async unmatch(transactionId: string, actor: AuthUser) {
     const txn = await this.getTxnOrThrow(transactionId);
     await this.assertMatchOverride(actor, txn.matchedExpenseId);
+    if (txn.matchedExpenseId) {
+      const matchedExpense = await this.prisma.expense.findUnique({
+        where: { id: txn.matchedExpenseId },
+        select: { settlementId: true },
+      });
+      await this.assertSettlementNotSubmitted(matchedExpense?.settlementId ?? null);
+    }
 
     const updated = await this.prisma.bankTransaction.update({
       where: { id: transactionId },
@@ -389,6 +397,7 @@ export class BankMatchingService {
     if (expense.status !== ExpenseStatus.READY_TO_MATCHING) {
       throw new BadRequestException('This expense has not cleared its approval chain yet - it cannot be matched');
     }
+    await this.assertSettlementNotSubmitted(expense.settlementId);
     await this.assertMatchOverride(actor, expenseId);
 
     const linkedTxn = await this.getLinkedMatchedTxn(expenseId);
@@ -416,6 +425,7 @@ export class BankMatchingService {
   async manualUnmatchExpense(expenseId: string, actor: AuthUser) {
     const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
     if (!expense) throw new NotFoundException('Expense not found');
+    await this.assertSettlementNotSubmitted(expense.settlementId);
     await this.assertMatchOverride(actor, expenseId);
 
     const linkedTxn = await this.getLinkedMatchedTxn(expenseId);
@@ -438,6 +448,21 @@ export class BankMatchingService {
     });
 
     return this.prisma.expense.findUniqueOrThrow({ where: { id: expenseId } });
+  }
+
+  // Blocks match/unmatch once the Expense's Settlement has left DRAFT_SETTLEMENT
+  // (Submit pressed) - mirrors addExpenses()/update()'s "only safe while still a
+  // draft" rule in settlements.service.ts. Without this, unmatch() could flip
+  // isMatched/status on an Expense already mid- or post-approval in its
+  // Settlement (settlementId stays set either way, since only the settlement's
+  // own flow clears it), letting it be silently re-matched out from under a
+  // batch that's already been submitted.
+  private async assertSettlementNotSubmitted(settlementId: string | null): Promise<void> {
+    if (!settlementId) return;
+    const settlement = await this.prisma.settlement.findUnique({ where: { id: settlementId }, select: { status: true } });
+    if (settlement && settlement.status !== SettlementStatus.DRAFT_SETTLEMENT) {
+      throw new BadRequestException('This expense\'s settlement has already been submitted - it can no longer be matched or unmatched');
+    }
   }
 
   private getLinkedMatchedTxn(expenseId: string) {
@@ -528,8 +553,8 @@ export class BankMatchingService {
       amount: Number(e.amount),
       expenseDate: e.expenseDate,
       salesName: e.sales.name,
-      advertiserName: e.advertiser.name,
-      brandName: e.brand.name,
+      advertiserName: e.advertiser?.name ?? '-',
+      brandName: e.brand?.name ?? '-',
     }));
   }
 
@@ -554,8 +579,8 @@ export class BankMatchingService {
       amount: Number(e.amount),
       expenseDate: e.expenseDate,
       salesName: e.sales.name,
-      advertiserName: e.advertiser.name,
-      brandName: e.brand.name,
+      advertiserName: e.advertiser?.name ?? '-',
+      brandName: e.brand?.name ?? '-',
     };
   }
 

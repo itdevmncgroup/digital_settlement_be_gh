@@ -40,12 +40,36 @@ export class MyDashboardController {
     return this.service.getManagementDashboard(actor);
   }
 
-  // Sales' own-expense dashboard (this month / pending approval / fully approved).
+  // List behind a Management dashboard tile: ?bucket=in-progress|complete.
+  @Get('management/expenses')
+  managementExpenses(@CurrentUser() actor: AuthUser, @Query('bucket') bucket: string) {
+    return this.service.getManagementExpenses(actor, bucket);
+  }
+
+  // Sales' own-expense dashboard (pending / complete = not yet / already sent to Odoo),
+  // ?range=7d|30d|90d|1y (default 30d). webmobile.dashboard.read.own = caller's
+  // Expenses, webmobile.dashboard.read.owndept = their Department(s)' Expenses;
+  // legacy dashboard.read.own still admitted (own scope).
   @Get('sales')
   @UseGuards(RolesGuard)
-  @RequirePermission('dashboard-sales.read.own')
-  sales(@CurrentUser() actor: AuthUser) {
-    return this.service.getSalesDashboard(actor);
+  @RequirePermission('webmobile.dashboard.read.own', 'webmobile.dashboard.read.owndept', 'dashboard.read.own')
+  sales(@CurrentUser() actor: AuthUser, @Query('range') range?: string) {
+    return this.service.getSalesDashboard(actor, range);
+  }
+
+  // List behind a Head POD / CO-CSO dashboard tile: ?kind=head-pod|co-cso&bucket=pending|complete.
+  // Who may call it is decided in the service (must be an active approver of that kind).
+  @Get('department/expenses')
+  departmentExpenses(@CurrentUser() actor: AuthUser, @Query('kind') kind: string, @Query('bucket') bucket: string) {
+    return this.service.getDepartmentOdooExpenses(actor, kind, bucket);
+  }
+
+  // List behind a Sales dashboard tile: ?bucket=pending|complete|attention&range=...
+  @Get('sales/expenses')
+  @UseGuards(RolesGuard)
+  @RequirePermission('webmobile.dashboard.read.own', 'webmobile.dashboard.read.owndept', 'dashboard.read.own')
+  salesExpenses(@CurrentUser() actor: AuthUser, @Query('bucket') bucket: string, @Query('range') range?: string) {
+    return this.service.getSalesDashboardExpenses(actor, bucket, range);
   }
 }
 

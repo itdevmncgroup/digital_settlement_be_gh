@@ -1,0 +1,14 @@
+[
+ {
+  "id": "b92a3158-e9ed-4bdf-8869-06efc7b04bf0",
+  "approvalLevelId": "141e8c98-04fe-4e53-b9b6-1025c7b10ef5",
+  "activityTypeId": "6571424b-dd10-44fa-b7a6-7301111bdf8d",
+  "createdAt": "2026-10-08T09:32:22.991Z"
+ },
+ {
+  "id": "d8f1e010-100f-4ede-a971-8de336d3eced",
+  "approvalLevelId": "ffa10c6d-3ebb-44b8-8cf1-b08f38e102de",
+  "activityTypeId": "6571424b-dd10-44fa-b7a6-7301111bdf8d",
+  "createdAt": "2026-10-09T07:15:42.137Z"
+ }
+]

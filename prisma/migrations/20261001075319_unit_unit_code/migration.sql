@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "approval_level_activity_types_approvalLevelId_activityTypeId_ke" RENAME TO "approval_level_activity_types_approvalLevelId_activityTypeI_key";

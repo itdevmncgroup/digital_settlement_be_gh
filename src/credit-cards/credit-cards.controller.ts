@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Delete, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { RoleName } from 'src/common/constants/role-name';
 import { CreditCardsService } from './credit-cards.service';
 import { CreateCreditCardDto, UpdateCreditCardDto } from './dto/credit-card.dto';
@@ -36,5 +36,11 @@ export class CreditCardsController {
   @Roles(RoleName.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateCreditCardDto, @CurrentUser() actor: AuthUser) {
     return this.service.update(id, dto, actor.userId);
+  }
+
+  @Delete(':id')
+  @Roles(RoleName.ADMIN)
+  remove(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.remove(id, actor.userId);
   }
 }

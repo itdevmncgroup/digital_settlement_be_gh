@@ -64,4 +64,10 @@ export class DepartmentsController {
   removeApprover(@Param('id') id: string, @Param('approverId') approverId: string, @CurrentUser() actor: AuthUser) {
     return this.departmentsService.removeApprover(id, approverId, actor.userId);
   }
+
+  @Delete(':id')
+  @Roles(RoleName.ADMIN)
+  remove(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.departmentsService.remove(id, actor.userId);
+  }
 }

@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { ExpenseStatus, SettlementStatus } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { ExpenseRequestStatus, ExpenseStatus, OdooSyncStatus, Prisma, SettlementStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApprovalsService } from '../approvals/approvals.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
@@ -90,33 +90,9 @@ const PENDING_REVIEW_STATUSES: ExpenseStatus[] = [
   ExpenseStatus.APPROVAL_CO_CFO_3TV,
 ];
 
-// Sales dashboard buckets. Pending = still inside the Expense chain
-// (HEAD_POD -> CO-CSO); fully approved = cleared CSO, i.e. everything from
-// READY_TO_MATCHING onward (matching / settlement / complete, plus legacy
-// APPROVED/SETTLED).
-const SALES_PENDING_STATUSES: ExpenseStatus[] = [
-  ExpenseStatus.SUBMITTED,
-  ExpenseStatus.PENDING_APPROVAL,
-  ExpenseStatus.APPROVAL_HEAD_POD,
-  ExpenseStatus.APPROVAL_KOORDINATOR,
-  ExpenseStatus.APPROVAL_SUPERVISOR,
-  ExpenseStatus.APPROVAL_DEPT_HEAD,
-  ExpenseStatus.APPROVAL_DIV_HEAD,
-  ExpenseStatus.APPROVAL_BOD,
-  ExpenseStatus.APPROVAL_CO_CSO,
-  ExpenseStatus.APPROVAL_CO_CSO_1, // legacy, pre-merge rows only
-  ExpenseStatus.APPROVAL_CO_CSO_2, // legacy, pre-merge rows only
-];
-const SALES_FULLY_APPROVED_STATUSES: ExpenseStatus[] = [
-  ExpenseStatus.READY_TO_MATCHING,
-  ExpenseStatus.READY_TO_SETTLED,
-  ExpenseStatus.APPROVAL_SLS_MAR_DIR,
-  ExpenseStatus.APPROVAL_VP_ACC_BIL_TAX_3TV,
-  ExpenseStatus.APPROVAL_CO_CFO_3TV,
-  ExpenseStatus.COMPLETE,
-  ExpenseStatus.SETTLED,
-  ExpenseStatus.APPROVED,
-];
+// Sales dashboard period picker (mobile "Last 7 days" ... "Last year").
+export const SALES_DASHBOARD_RANGES = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 } as const;
+export type SalesDashboardRange = keyof typeof SALES_DASHBOARD_RANGES;
 
 // Statuses shown as "Review Expense" in the recent-activity feed - still with
 // Sales/Finance before it ever reaches an approval tier proper.
@@ -147,29 +123,106 @@ export class DashboardService {
   // resolveApprover's ANY branch). "Total expense" here always means
   // SETTLED-only (money actually fully approved), not every in-flight status
   // like summary()'s unfiltered totalExpense.
-  // Only the caller's own Expenses (salesId = actor), never department-scoped.
-  async getSalesDashboard(actor: AuthUser) {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const own = { salesId: actor.userId };
-    const [month, pending, fullyApproved, needsRevisionCount, recent] = await Promise.all([
-      this.prisma.expense.aggregate({
-        where: { ...own, createdAt: { gte: monthStart, lt: nextMonthStart } },
-        _count: { _all: true },
-        _sum: { amount: true },
-      }),
-      this.prisma.expense.aggregate({
-        where: { ...own, status: { in: SALES_PENDING_STATUSES } },
-        _count: { _all: true },
-        _sum: { amount: true },
-      }),
-      this.prisma.expense.aggregate({
-        where: { ...own, status: { in: SALES_FULLY_APPROVED_STATUSES } },
-        _count: { _all: true },
-        _sum: { amount: true },
-      }),
-      this.prisma.expense.count({ where: { ...own, status: { in: [ExpenseStatus.REJECTED, ExpenseStatus.REVISION] } } }),
+  // webmobile.dashboard.read.owndept widens the owner filter from the caller's
+  // own Expenses (salesId) to every Expense of their Department(s); holding
+  // only webmobile.dashboard.read.own (or the legacy dashboard.read.own) keeps
+  // it to salesId = actor.
+  private async salesScope(actor: AuthUser, range?: string) {
+    const key: SalesDashboardRange = range && Object.prototype.hasOwnProperty.call(SALES_DASHBOARD_RANGES, range) ? (range as SalesDashboardRange) : '30d';
+    const to = new Date();
+    const from = new Date(to);
+    from.setDate(from.getDate() - SALES_DASHBOARD_RANGES[key]);
+    const owner = actor.permissions?.includes('webmobile.dashboard.read.owndept')
+      ? { departmentId: { in: await getActorDepartmentIds(this.prisma, actor.userId) } }
+      : { salesId: actor.userId };
+    return {
+      key,
+      from,
+      to,
+      own: { ...owner, createdAt: { gte: from, lte: to } },
+      sentToOdoo: { settlement: { is: { odooSyncStatus: OdooSyncStatus.SENT } } },
+      needsAttention: { status: { in: [ExpenseStatus.REJECTED, ExpenseStatus.REVISION] } },
+    };
+  }
+
+  // Drill-down behind each Sales dashboard tile - same where clause as the
+  // tile's own aggregate, so the list always matches the number shown.
+  async getSalesDashboardExpenses(actor: AuthUser, bucket: string, range?: string) {
+    const { own, sentToOdoo, needsAttention } = await this.salesScope(actor, range);
+    const bucketWhere =
+      bucket === 'complete' ? sentToOdoo : bucket === 'pending' ? { NOT: sentToOdoo } : bucket === 'attention' ? needsAttention : null;
+    if (!bucketWhere) throw new BadRequestException('bucket must be pending, complete or attention');
+    return this.prisma.expense.findMany({
+      where: { ...own, ...bucketWhere },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        expenseNo: true,
+        expenseDate: true,
+        purpose: true,
+        amount: true,
+        status: true,
+        salesId: true,
+        sales: { select: { name: true } },
+        advertiser: { select: { name: true } },
+        brand: { select: { name: true } },
+      },
+    });
+  }
+
+  // Drill-down behind the Head POD / CO-CSO dashboard's Department expense tiles: the
+  // Expenses of the Department(s) the caller is an active approver for, split like
+  // departmentOdooSplit (pending = not sent to Odoo yet, complete = Settlement SENT).
+  async getDepartmentOdooExpenses(actor: AuthUser, kind: string, bucket: string) {
+    const approver =
+      kind === 'head-pod'
+        ? { code: { equals: 'HEAD-POD' } as { equals: string }, label: 'Head POD' }
+        : kind === 'co-cso'
+          ? { code: { in: ['CO-CSO', 'CO_CSO'] } as { in: string[] }, label: 'CO-CSO' }
+          : null;
+    if (!approver) throw new BadRequestException('kind must be head-pod or co-cso');
+    if (bucket !== 'pending' && bucket !== 'complete') throw new BadRequestException('bucket must be pending or complete');
+
+    const assignments = await this.prisma.departmentPositionAssignment.findMany({
+      where: { userId: actor.userId, position: { code: approver.code }, status: 'ACTIVE' },
+      select: { departmentId: true },
+    });
+    if (assignments.length === 0) throw new ForbiddenException(`Not an active ${approver.label}`);
+
+    const sentToOdoo = { settlement: { is: { odooSyncStatus: OdooSyncStatus.SENT } } };
+    return this.prisma.expense.findMany({
+      where: {
+        departmentId: { in: assignments.map((a) => a.departmentId) },
+        ...(bucket === 'complete' ? sentToOdoo : { NOT: sentToOdoo }),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        expenseNo: true,
+        expenseDate: true,
+        purpose: true,
+        amount: true,
+        status: true,
+        salesId: true,
+        sales: { select: { name: true } },
+        department: { select: { name: true } },
+        advertiser: { select: { name: true } },
+        brand: { select: { name: true } },
+      },
+    });
+  }
+
+  // The caller's own Expenses (salesId = actor), or their Department(s)' Expenses
+  // with webmobile.dashboard.read.owndept, created within the picked range (default 30d). "Complete" = already grouped
+  // into a Settlement that has been sent to Odoo (odooSyncStatus SENT);
+  // "pending" = every other Expense of the caller in range (not sent to Odoo yet).
+  async getSalesDashboard(actor: AuthUser, range?: string) {
+    const { key, from, to, own, sentToOdoo, needsAttention } = await this.salesScope(actor, range);
+    const [total, pending, complete, needsRevisionCount, recent, byDepartment] = await Promise.all([
+      this.prisma.expense.aggregate({ where: own, _count: { _all: true }, _sum: { amount: true } }),
+      this.prisma.expense.aggregate({ where: { ...own, NOT: sentToOdoo }, _count: { _all: true }, _sum: { amount: true } }),
+      this.prisma.expense.aggregate({ where: { ...own, ...sentToOdoo }, _count: { _all: true }, _sum: { amount: true } }),
+      this.prisma.expense.count({ where: { ...own, ...needsAttention } }),
       this.prisma.expense.findMany({
         where: own,
         orderBy: { createdAt: 'desc' },
@@ -186,44 +239,182 @@ export class DashboardService {
           brand: { select: { name: true } },
         },
       }),
+      this.salesExpenseByDepartment(actor.userId, own),
     ]);
     return {
-      month: { from: monthStart, to: nextMonthStart, count: month._count._all, totalAmount: month._sum.amount ?? 0 },
+      range: key,
+      period: { from, to },
+      total: { count: total._count._all, totalAmount: total._sum.amount ?? 0 },
       pending: { count: pending._count._all, totalAmount: pending._sum.amount ?? 0 },
-      fullyApproved: { count: fullyApproved._count._all, totalAmount: fullyApproved._sum.amount ?? 0 },
+      complete: { count: complete._count._all, totalAmount: complete._sum.amount ?? 0 },
       needsRevisionCount,
       recent,
+      byDepartment,
     };
+  }
+
+  // Total Expense amount per Department the caller belongs to, over the same scope and
+  // range as the dashboard's other numbers (so they add up to the same total).
+  private async salesExpenseByDepartment(userId: string, own: Prisma.ExpenseWhereInput) {
+    const departmentIds = await getActorDepartmentIds(this.prisma, userId);
+    if (departmentIds.length <= 1) return [];
+    const departments = await this.prisma.department.findMany({ where: { id: { in: departmentIds } }, select: { id: true, name: true } });
+    return this.departmentExpenseTotals(departments, own);
+  }
+
+  // Total Expense amount + count per given Department under `where`, biggest first. Only
+  // filled when there is more than one Department - with one there is nothing to compare, so
+  // the chart is left out. Departments with no matching Expense still appear, at 0.
+  private async departmentExpenseTotals(departments: { id: string; name: string }[], where: Prisma.ExpenseWhereInput) {
+    if (departments.length <= 1) return [];
+    const groups = await this.prisma.expense.groupBy({
+      by: ['departmentId'],
+      where: { AND: [where, { departmentId: { in: departments.map((d) => d.id) } }] },
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+    const byId = new Map(groups.map((g) => [g.departmentId, g]));
+    return departments
+      .map((d) => {
+        const g = byId.get(d.id);
+        return { id: d.id, name: d.name, count: g?._count._all ?? 0, totalAmount: g?._sum.amount ?? 0 };
+      })
+      .sort((a, b) => Number(b.totalAmount) - Number(a.totalAmount) || a.name.localeCompare(b.name));
   }
 
   // Head POD's own-pod dashboard: expenses in the Department(s) they are the
   // active HEAD_POD approver for. "Not complete" = still moving through the
   // approval/matching/settlement chains, so DRAFT (never submitted) and
   // REJECTED (dead) are left out; "complete" = the Settlement chain finished.
-  getHeadPodDashboard(actor: AuthUser) {
-    return this.getDepartmentApproverDashboard(actor, { equals: 'HEAD_POD' }, 'Head POD');
+  // On top of the shared shape it adds the Odoo-based split (pending = not yet
+  // sent to Odoo, complete = Settlement sent to Odoo) and the top-10 Sales by
+  // expense amount, all over the Department(s) they head.
+  async getHeadPodDashboard(actor: AuthUser) {
+    const base = await this.getDepartmentApproverDashboard(actor, { equals: 'HEAD-POD' }, 'Head POD');
+    const where = { departmentId: { in: base.departments.map((d) => d.id) } };
+    const [odoo, byDepartment, topGroups] = await Promise.all([
+      this.departmentOdooSplit(where),
+      this.departmentExpenseTotals(base.departments, where),
+      this.prisma.expense.groupBy({
+        by: ['salesId'],
+        where,
+        _sum: { amount: true },
+        _count: { _all: true },
+        orderBy: { _sum: { amount: 'desc' } },
+        take: 10,
+      }),
+    ]);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: topGroups.map((g) => g.salesId) } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
+    return {
+      ...base,
+      ...odoo,
+      byDepartment,
+      topSales: topGroups.map((g) => ({
+        id: g.salesId,
+        name: nameById.get(g.salesId) ?? '-',
+        count: g._count._all,
+        totalAmount: g._sum.amount ?? 0,
+      })),
+    };
   }
 
-  // Same shape for CO-CSO (single merged tier), who can cover many Departments
-  // (one DepartmentPositionAssignment each).
-  getCoCsoDashboard(actor: AuthUser) {
-    return this.getDepartmentApproverDashboard(actor, { in: ['CO-CSO', 'CO_CSO'] }, 'CO-CSO');
+  // Same Odoo split for CO-CSO over every Department they cover, plus the top-10
+  // Departments by expense already sent to Odoo ("complete").
+  async getCoCsoDashboard(actor: AuthUser) {
+    const base = await this.getDepartmentApproverDashboard(actor, { in: ['CO-CSO', 'CO_CSO'] }, 'CO-CSO');
+    const where = { departmentId: { in: base.departments.map((d) => d.id) } };
+    const [odoo, byDepartment, topGroups] = await Promise.all([
+      this.departmentOdooSplit(where),
+      this.departmentExpenseTotals(base.departments, where),
+      this.prisma.expense.groupBy({
+        by: ['departmentId'],
+        where: { ...where, settlement: { is: { odooSyncStatus: OdooSyncStatus.SENT } } },
+        _sum: { amount: true },
+        _count: { _all: true },
+        orderBy: { _sum: { amount: 'desc' } },
+        take: 10,
+      }),
+    ]);
+    const nameById = new Map(base.departments.map((d) => [d.id, d.name]));
+    return {
+      ...base,
+      ...odoo,
+      byDepartment,
+      topDepartments: topGroups.map((g) => ({
+        id: g.departmentId as string,
+        name: nameById.get(g.departmentId as string) ?? '-',
+        count: g._count._all,
+        totalAmount: g._sum.amount ?? 0,
+      })),
+    };
+  }
+
+  // pending = every Expense in scope not yet sent to Odoo; complete = its
+  // Settlement has odooSyncStatus SENT.
+  private async departmentOdooSplit(where: { departmentId: { in: string[] } }) {
+    const sentToOdoo = { settlement: { is: { odooSyncStatus: OdooSyncStatus.SENT } } };
+    const [pending, complete] = await Promise.all([
+      this.prisma.expense.aggregate({ where: { ...where, NOT: sentToOdoo }, _count: { _all: true }, _sum: { amount: true } }),
+      this.prisma.expense.aggregate({ where: { ...where, ...sentToOdoo }, _count: { _all: true }, _sum: { amount: true } }),
+    ]);
+    return {
+      odooPending: { count: pending._count._all, totalAmount: pending._sum.amount ?? 0 },
+      odooComplete: { count: complete._count._all, totalAmount: complete._sum.amount ?? 0 },
+    };
   }
 
   // Management (any Position - DEPT_HEAD/DIV_HEAD/BOD/...): the Departments
   // they belong to or approve for; dashboard.read.all widens that to everything.
   async getManagementDashboard(actor: AuthUser) {
+    const { ids, departments } = await this.managementScope(actor);
+    return this.buildDepartmentDashboard(actor, ids, departments);
+  }
+
+  // Drill-down behind the Management dashboard tiles: ?bucket=in-progress|complete, the same
+  // status split and Department scope as buildDepartmentDashboard's two totals.
+  async getManagementExpenses(actor: AuthUser, bucket: string) {
+    if (bucket !== 'in-progress' && bucket !== 'complete') throw new BadRequestException('bucket must be in-progress or complete');
+    const { ids } = await this.managementScope(actor);
+    return this.prisma.expense.findMany({
+      where: {
+        departmentId: ids ? { in: ids } : undefined,
+        status:
+          bucket === 'complete'
+            ? ExpenseStatus.COMPLETE
+            : { notIn: [ExpenseStatus.COMPLETE, ExpenseStatus.DRAFT, ExpenseStatus.PENDING_SALES_ADMIN, ExpenseStatus.REJECTED] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        expenseNo: true,
+        expenseDate: true,
+        purpose: true,
+        amount: true,
+        status: true,
+        salesId: true,
+        sales: { select: { name: true } },
+        department: { select: { name: true } },
+        advertiser: { select: { name: true } },
+        brand: { select: { name: true } },
+      },
+    });
+  }
+
+  // ids undefined = every Department (dashboard.read.all).
+  private async managementScope(actor: AuthUser): Promise<{ ids: string[] | undefined; departments: { id: string; name: string }[] }> {
     if (!(actor.roles ?? []).includes(RoleName.MANAGEMENT)) throw new ForbiddenException('Not a Management user');
-    if (actor.permissions?.includes('dashboard.read.all')) {
-      return this.buildDepartmentDashboard(actor, undefined, []);
-    }
+    if (actor.permissions?.includes('dashboard.read.all')) return { ids: undefined, departments: [] };
     const ids = await getActorDepartmentIds(this.prisma, actor.userId);
     const departments = await this.prisma.department.findMany({
       where: { id: { in: ids } },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });
-    return this.buildDepartmentDashboard(actor, ids, departments);
+    return { ids, departments };
   }
 
   private async getDepartmentApproverDashboard(
@@ -243,6 +434,31 @@ export class DashboardService {
     );
   }
 
+  // Expense Requests (Karangan Bunga) waiting on the actor right now. They are a
+  // separate flow that approvals.findPendingFor leaves out, so the dashboard's
+  // "waiting approval" count adds them. Same rule as the mobile Approval page:
+  // current approval step is the actor's (Admin: any), or the request is at
+  // Corsec verification and the actor holds the CORSEC position (Admin: any).
+  private async countPendingExpenseRequests(actor: AuthUser): Promise<number> {
+    const isAdmin = (actor.roles ?? []).includes(RoleName.ADMIN);
+    const user = await this.prisma.user.findUnique({ where: { id: actor.userId }, select: { position: { select: { code: true } } } });
+    const isCorsec = user?.position?.code === 'CORSEC';
+    const rows = await this.prisma.expenseRequest.findMany({
+      where: { status: { in: [ExpenseRequestStatus.PENDING_APPROVAL, ExpenseRequestStatus.CORSEC_VERIFICATION] } },
+      select: {
+        status: true,
+        approvalRequest: { select: { status: true, currentStep: true, steps: { select: { stepOrder: true, resolvedApproverId: true } } } },
+      },
+    });
+    return rows.filter((r) => {
+      if (r.status === ExpenseRequestStatus.CORSEC_VERIFICATION) return isCorsec || isAdmin;
+      const ar = r.approvalRequest;
+      if (!ar || ar.status !== 'PENDING') return false;
+      const step = ar.steps.find((s) => s.stepOrder === ar.currentStep);
+      return !!step && (step.resolvedApproverId === actor.userId || isAdmin);
+    }).length;
+  }
+
   // departmentIds undefined = every Department.
   private async buildDepartmentDashboard(
     actor: AuthUser,
@@ -251,9 +467,12 @@ export class DashboardService {
   ) {
     const departmentId = departmentIds ? { in: departmentIds } : undefined;
 
-    const [inProgress, complete, pending] = await Promise.all([
+    // In progress + complete = every Expense past DRAFT/PENDING_SALES_ADMIN that is not REJECTED,
+    // so the per-department bars add up to the two totals below.
+    const countedStatuses = { status: { notIn: [ExpenseStatus.DRAFT, ExpenseStatus.PENDING_SALES_ADMIN, ExpenseStatus.REJECTED] } };
+    const [inProgress, complete, pending, pendingRequestCount, byDepartment] = await Promise.all([
       this.prisma.expense.aggregate({
-        where: { departmentId, status: { notIn: [ExpenseStatus.COMPLETE, ExpenseStatus.DRAFT, ExpenseStatus.REJECTED] } },
+        where: { departmentId, status: { notIn: [ExpenseStatus.COMPLETE, ExpenseStatus.DRAFT, ExpenseStatus.PENDING_SALES_ADMIN, ExpenseStatus.REJECTED] } },
         _count: { _all: true },
         _sum: { amount: true },
       }),
@@ -263,16 +482,19 @@ export class DashboardService {
         _sum: { amount: true },
       }),
       this.approvals.findPendingFor(actor.userId, actor.permissions),
+      this.countPendingExpenseRequests(actor),
+      this.departmentExpenseTotals(departments, countedStatuses),
     ]);
 
     return {
+      byDepartment,
       pods: departments,
       departments,
       allDepartments: !departmentIds,
       notComplete: { count: inProgress._count._all, totalAmount: inProgress._sum.amount ?? 0 },
       complete: { count: complete._count._all, totalAmount: complete._sum.amount ?? 0 },
       // Only what is actionable right now (BOD-style lookahead rows excluded).
-      pendingApprovalCount: pending.filter((p) => p.isMyTurn).length,
+      pendingApprovalCount: pending.filter((p) => p.isMyTurn).length + pendingRequestCount,
     };
   }
 
@@ -287,20 +509,20 @@ export class DashboardService {
     // For BOD, findPendingFor also includes requests still waiting on an
     // earlier approver (read-only lookahead - see its isMyTurn flag) - the
     // dashboard count must stay "actionable right now", so filter those out.
-    const pendingApprovalCount = pending.filter((p) => p.isMyTurn).length;
+    const pendingApprovalCount = pending.filter((p) => p.isMyTurn).length + (await this.countPendingExpenseRequests(actor));
 
     // "jumlah expense" dashboard stat: sum of Expense.amount whose Settlement has
     // reached COMPLETE. SALES/SALES_ADMIN and HEAD_POD only see their own pod(s)
     // (Department); every other role (ADMIN etc.) sees the company-wide total.
     const isPodRestricted =
-      positionCode === 'HEAD_POD' ||
+      positionCode === 'HEAD-POD' ||
       (actor.roles ?? []).some((r) => r === RoleName.SALES || r === RoleName.SALES_ADMIN);
 
     let headPodAssignments: { departmentId: string; department: { id: string; name: string } }[] = [];
     let podDepartmentIds: string[] = [];
-    if (positionCode === 'HEAD_POD') {
+    if (positionCode === 'HEAD-POD') {
       headPodAssignments = await this.prisma.departmentPositionAssignment.findMany({
-        where: { userId: actor.userId, position: { code: 'HEAD_POD' }, status: 'ACTIVE' },
+        where: { userId: actor.userId, position: { code: 'HEAD-POD' }, status: 'ACTIVE' },
         include: { department: true },
       });
       podDepartmentIds = headPodAssignments.map((a) => a.departmentId);
@@ -325,7 +547,7 @@ export class DashboardService {
     const departmentScopeWhere = departmentScopeIds ? { in: departmentScopeIds } : undefined;
     const [incompleteAgg, completeAgg, pendingReviewCount, expenseByDepartment, recentActivity] = await Promise.all([
       this.prisma.expense.aggregate({
-        where: { departmentId: departmentScopeWhere, status: { in: [ExpenseStatus.DRAFT, ExpenseStatus.REVISION] } },
+        where: { departmentId: departmentScopeWhere, status: { in: [ExpenseStatus.DRAFT, ExpenseStatus.PENDING_SALES_ADMIN, ExpenseStatus.REVISION] } },
         _sum: { amount: true },
       }),
       this.prisma.expense.aggregate({
@@ -344,7 +566,7 @@ export class DashboardService {
       recentActivity,
     };
 
-    if (positionCode === 'HEAD_POD') {
+    if (positionCode === 'HEAD-POD') {
       const agg = await this.prisma.expense.aggregate({
         where: { departmentId: { in: podDepartmentIds }, status: ExpenseStatus.SETTLED },
         _sum: { amount: true },
@@ -359,7 +581,7 @@ export class DashboardService {
       };
     }
 
-    if (positionCode === 'DEPT_HEAD' || positionCode === 'DIV_HEAD') {
+    if (positionCode === 'DEPT-HEAD' || positionCode === 'DIV-HEAD') {
       const agg = await this.prisma.expense.aggregate({
         where: { departmentId: { in: userDepartmentIds }, status: ExpenseStatus.SETTLED },
         _sum: { amount: true },
@@ -401,7 +623,7 @@ export class DashboardService {
     const [incomplete, complete] = await Promise.all([
       this.prisma.expense.groupBy({
         by: ['departmentId'],
-        where: { departmentId: scopeWhere, status: { in: [ExpenseStatus.DRAFT, ExpenseStatus.REVISION] } },
+        where: { departmentId: scopeWhere, status: { in: [ExpenseStatus.DRAFT, ExpenseStatus.PENDING_SALES_ADMIN, ExpenseStatus.REVISION] } },
         _count: true,
       }),
       this.prisma.expense.groupBy({
@@ -910,13 +1132,13 @@ export class DashboardService {
     };
   }
 
-  // externalSyncedAt is set the moment a Settlement's final tier is submitted
-  // and pushed to the external system (ExternalSyncService) - the closest
-  // thing to a "finished" timestamp the schema has, so processing time is
-  // measured from createdAt to there. Settlements never synced (still mid-
-  // chain, or rejected) don't have one and are excluded.
-  private averageProcessingDays(rows: { createdAt: Date; externalSyncedAt: Date | null }[]): number {
-    const days = rows.filter((r) => r.externalSyncedAt).map((r) => (r.externalSyncedAt!.getTime() - r.createdAt.getTime()) / 86_400_000);
+  // sentAt is set the moment a Settlement's push to the external system
+  // (ExternalSyncService) succeeds - the closest thing to a "finished"
+  // timestamp the schema has, so processing time is measured from createdAt
+  // to there. Settlements never successfully synced (still mid-chain,
+  // rejected, PENDING, or FAILED) don't have one and are excluded.
+  private averageProcessingDays(rows: { createdAt: Date; sentAt: Date | null }[]): number {
+    const days = rows.filter((r) => r.sentAt).map((r) => (r.sentAt!.getTime() - r.createdAt.getTime()) / 86_400_000);
     return days.length ? days.reduce((a, b) => a + b, 0) / days.length : 0;
   }
 
@@ -929,7 +1151,7 @@ export class DashboardService {
       this.prisma.settlement.aggregate({ where: { ...where, status: SettlementStatus.COMPLETE }, _sum: { totalAmount: true }, _count: true }),
       this.prisma.settlement.aggregate({ where: { ...where, status: { in: SETTLEMENT_WAITING_STATUSES } }, _sum: { totalAmount: true }, _count: true }),
       this.prisma.settlement.aggregate({ where: { ...where, status: SettlementStatus.REJECTED }, _sum: { totalAmount: true }, _count: true }),
-      this.prisma.settlement.findMany({ where: { ...where, externalSyncedAt: { not: null } }, select: { createdAt: true, externalSyncedAt: true } }),
+      this.prisma.settlement.findMany({ where: { ...where, sentAt: { not: null } }, select: { createdAt: true, sentAt: true } }),
     ]);
 
     // "vs previous period" deltas only make sense when the caller actually
@@ -945,7 +1167,7 @@ export class DashboardService {
       const prevWhere = this.buildSettlementWhere({ ...filter, from: prevFrom.toISOString(), to: prevTo.toISOString() }, departmentIds);
       const [prevTotalAgg, prevCompleted] = await Promise.all([
         this.prisma.settlement.aggregate({ where: prevWhere, _sum: { totalAmount: true }, _count: true }),
-        this.prisma.settlement.findMany({ where: { ...prevWhere, externalSyncedAt: { not: null } }, select: { createdAt: true, externalSyncedAt: true } }),
+        this.prisma.settlement.findMany({ where: { ...prevWhere, sentAt: { not: null } }, select: { createdAt: true, sentAt: true } }),
       ]);
       previous = {
         totalAmount: Number(prevTotalAgg._sum.totalAmount ?? 0),
@@ -1123,14 +1345,14 @@ export class DashboardService {
     const departmentIds = await this.resolveDepartmentScope(actor);
     const where = this.buildSettlementWhere({ ...filter, status: undefined }, departmentIds);
     const settlements = await this.prisma.settlement.findMany({
-      where: { ...where, externalSyncedAt: { not: null } },
-      select: { departmentId: true, createdAt: true, externalSyncedAt: true },
+      where: { ...where, sentAt: { not: null } },
+      select: { departmentId: true, createdAt: true, sentAt: true },
     });
     if (settlements.length === 0) return [];
 
     const byDept = new Map<string, number[]>();
     for (const s of settlements) {
-      const days = (s.externalSyncedAt!.getTime() - s.createdAt.getTime()) / 86_400_000;
+      const days = (s.sentAt!.getTime() - s.createdAt.getTime()) / 86_400_000;
       const list = byDept.get(s.departmentId) ?? [];
       list.push(days);
       byDept.set(s.departmentId, list);
@@ -1209,8 +1431,8 @@ export class DashboardService {
         _count: true,
       }),
       this.prisma.settlement.findMany({
-        where: { expenses: { some: where }, externalSyncedAt: { not: null } },
-        select: { createdAt: true, externalSyncedAt: true },
+        where: { expenses: { some: where }, sentAt: { not: null } },
+        select: { createdAt: true, sentAt: true },
       }),
     ]);
 
@@ -1240,8 +1462,8 @@ export class DashboardService {
           _sum: { amount: true },
         }),
         this.prisma.settlement.findMany({
-          where: { expenses: { some: prevWhere }, externalSyncedAt: { not: null } },
-          select: { createdAt: true, externalSyncedAt: true },
+          where: { expenses: { some: prevWhere }, sentAt: { not: null } },
+          select: { createdAt: true, sentAt: true },
         }),
       ]);
       const prevTotalExpense = Number(prevTotalAgg._sum.amount ?? 0);

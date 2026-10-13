@@ -1,0 +1,212 @@
+[
+ {
+  "id": "13143cdf-3ebd-4c8c-9871-f153d18b8e78",
+  "code": "expense.read.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "1976522b-f53d-474b-850e-8d65a76013e5",
+  "code": "request.expense.edit.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "1d983c1f-ab7f-49f5-a4ee-69de30b46c7a",
+  "code": "expense.match.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "28f7b710-f7fa-4f58-b2e6-0fdfd08aa7a9",
+  "code": "expense.automatch",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "301d5c54-2bc0-41f0-8e7f-f7f6f8547686",
+  "code": "audit-report.read.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "32df67aa-2c4d-414c-9f9c-bb1628ef7030",
+  "code": "webmobile.dashboard.read.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "382c937b-48a8-4995-976f-83dd1f93df9b",
+  "code": "expense.edit.own",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "385e0933-f4e9-480d-b013-ba2ec84ab366",
+  "code": "expense.read.own",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "3c4f356e-e934-4b0c-a7ac-6f4b65e204eb",
+  "code": "settlement.create.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "3f19ab30-8599-4dbc-a5f2-f095d17bda34",
+  "code": "settlement.send.odoo.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "4266d9d7-490c-4e51-ba4b-ce20c1c6176d",
+  "code": "approval.read.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "427d579d-ba7d-4564-8d3e-e4450a662434",
+  "code": "settlement.read.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "42b55827-3330-4920-83cf-d8b6966d4839",
+  "code": "settlement.send.odoo.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "4de8336a-3706-459a-b1c4-8b796b540acd",
+  "code": "dashboard.read.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "517719ce-eead-4d59-abdb-883453a85d54",
+  "code": "expense.edit.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "5c193a30-2230-4df0-8f9a-68d02810b64f",
+  "code": "expense.approve.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "5c9293f2-8613-4007-b13c-7b831a845b86",
+  "code": "request.expense.read.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "6952df6b-80f9-406f-bf0a-4cd5448942e9",
+  "code": "dashboard.read.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "6b02e763-83f5-4b2d-9540-b986f04ce346",
+  "code": "expense.match.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "8058887e-6207-4200-804f-69c35582843d",
+  "code": "expense.match.ownpod",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "82b7b590-2e33-4eaa-a332-9d94582d65dc",
+  "code": "audit-report.read.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "85aa5004-b5e4-41dc-8c34-4edfedc2ec43",
+  "code": "approval.read.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "8d39edb7-4819-4ce6-a445-ca8569a291aa",
+  "code": "request.expense.create.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "93465958-cac8-45e9-808c-5256191429a6",
+  "code": "expense.read.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "9eead337-f03f-48de-b7a2-7a4fc3dacae1",
+  "code": "expense.create.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "a0067814-faae-49cc-aff9-d9523023debc",
+  "code": "user.manage",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "b84952ce-0810-440e-b171-2e253e944bd7",
+  "code": "master.manage",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "bfbc135d-e738-4020-84ce-ece1598c5964",
+  "code": "expense.approve.all",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "c88b68ca-8e3f-454d-90cd-5029a561783d",
+  "code": "dashboard.read.own",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "d4a26984-2d34-4f6c-85c1-4dba0702b62b",
+  "code": "expense.create.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "db1b0034-ccf1-42bd-83eb-b3072ba9b377",
+  "code": "report.export",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "e5906e08-59cb-45e0-8c25-959a59b4a159",
+  "code": "settlement.read.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "f21a6e48-bf74-45af-b90c-2080addc3feb",
+  "code": "expense.edit.owndept",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "f9ee1868-83f5-40dd-b674-988176d37be3",
+  "code": "webmobile.dashboard.read.own",
+  "description": null,
+  "isActive": true
+ },
+ {
+  "id": "c5ef2b8e-a08b-427d-99a2-68b748ac7009",
+  "code": "expense.create.own",
+  "description": null,
+  "isActive": true
+ }
+]

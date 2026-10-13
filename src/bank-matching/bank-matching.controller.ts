@@ -36,7 +36,11 @@ export class BankMatchingController {
     return this.service.findAllBatches();
   }
 
+  // Backs the Expense list's "Statement Transaction" popup - viewing a batch's
+  // scanned lines only needs ordinary expense-read access, not the controller's
+  // default ADMIN/MANAGEMENT role gate.
   @Get(':id')
+  @RequirePermission('expense.read.all', 'expense.read.owndept', 'expense.read.own')
   findOne(@Param('id') id: string) {
     return this.service.findBatch(id);
   }

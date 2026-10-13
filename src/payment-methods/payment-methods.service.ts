@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { assertUnused, deleteRecord } from '../common/delete.util';
 import { CreatePaymentMethodDto, UpdatePaymentMethodDto } from './dto/payment-method.dto';
 
 @Injectable()
@@ -28,5 +29,16 @@ export class PaymentMethodsService {
     const item = await this.prisma.paymentMethod.update({ where: { id }, data: dto });
     await this.audit.log({ userId: actorId, action: 'UPDATE', objectType: 'PaymentMethod', objectId: id, oldValue: before, newValue: item });
     return item;
+  }
+
+  async remove(id: string, actorId: string) {
+    const before = await this.findOne(id);
+    // FK is ON DELETE SET NULL - the database would silently orphan these, so refuse instead.
+    await assertUnused('Payment method', [
+      ['expense(s)', this.prisma.expense.count({ where: { paymentMethodId: id } })],
+    ]);
+    await deleteRecord('Payment method', () => this.prisma.paymentMethod.delete({ where: { id } }));
+    await this.audit.log({ userId: actorId, action: 'DELETE', objectType: 'PaymentMethod', objectId: id, oldValue: before });
+    return { id };
   }
 }

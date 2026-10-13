@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { assertUnused, deleteRecord } from '../common/delete.util';
 import { codeNameWhere } from '../common/search.util';
 import { CreateAdvertiserDto, UpdateAdvertiserDto } from './dto/advertiser.dto';
 
@@ -49,5 +50,16 @@ export class AdvertisersService {
     const item = await this.prisma.advertiser.update({ where: { id }, data: dto, include: { agency: true } });
     await this.audit.log({ userId: actorId, action: 'UPDATE', objectType: 'Advertiser', objectId: id, oldValue: before, newValue: item });
     return item;
+  }
+
+  async remove(id: string, actorId: string) {
+    const before = await this.findOne(id);
+    // FK is ON DELETE SET NULL - the database would silently orphan these, so refuse instead.
+    await assertUnused('Advertiser', [
+      ['expense participant(s)', this.prisma.expenseParticipant.count({ where: { advertiserId: id } })],
+    ]);
+    await deleteRecord('Advertiser', () => this.prisma.advertiser.delete({ where: { id } }));
+    await this.audit.log({ userId: actorId, action: 'DELETE', objectType: 'Advertiser', objectId: id, oldValue: before });
+    return { id };
   }
 }
